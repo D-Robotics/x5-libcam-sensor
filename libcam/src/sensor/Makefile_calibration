@@ -1,0 +1,173 @@
+
+# make for build
+ifeq (${BUILD_OUTPUT_PATH},)
+export BUILD_OUTPUT_PATH=$(shell pwd)
+endif
+
+ifeq ($(TARGET),)
+# make for all sub list
+
+SUB_IGNORE =
+SUB_ALL = $(filter-out $(SUB_IGNORE),$(notdir $(shell find . -mindepth 1 -maxdepth 1 -type d)))
+ifeq ($(SUB_USEALL),)
+# filter notuse sub
+SUB_NOTUSE = $(shell [ -f notuse ] && cat notuse |grep -v "^\#")
+SUB_LIST = $(filter-out $(SUB_NOTUSE),$(SUB_ALL))
+else
+SUB_LIST = $(SUB_ALL)
+endif
+SUB_CLEAN  = $(addsuffix _clean,$(SUB_LIST))
+SUB_INSTALL = $(addsuffix _install,$(SUB_LIST))
+SUB_VER  = $(addsuffix _version,$(SUB_LIST))
+
+# calib sub Makefile
+SUB_MAKE = \
+ifeq ($${BUILD_OUTPUT_PATH},)\n\
+export BUILD_OUTPUT_PATH=$$(shell pwd)\n\
+endif\n\
+\n\
+SUB_TYPE = $$(notdir $$(shell dirname `pwd`))\n\
+TARGET = $$(notdir $$(shell pwd))\n\
+\n\
+include ../../../Makefile_$$(SUB_TYPE)
+
+.PHONY: all all_32 clean install version $(SUB_LIST) $(SUB_CLEAN) $(SUB_VER)
+
+all all_32: $(SUB_LIST)
+	$(Q)[ -z "$(SUB_NOTUSE)" ] || echo "** NOTUSE: $(SUB_NOTUSE)"
+	$(Q)[ -z "$(SUB_NOTUSE)" ] || echo "---> USED: $(SUB_LIST)"
+
+clean: $(SUB_CLEAN)
+
+install: $(SUB_INSTALL)
+
+version: $(SUB_VER)
+
+$(SUB_LIST):
+	$(Q)echo MK $(SUB_PARENT) $(SUB_TYPE): $@
+	$(Q)[ -f $@/Makefile ] || (echo "GEN $@/Makefile"; echo -e '$(SUB_MAKE)' |sed -e 's/^[  ]//' > $@/Makefile)
+	$(Q)$(MAKE) BUILD_OUTPUT_PATH=${BUILD_OUTPUT_PATH}/$@ -C ./$@
+
+$(SUB_CLEAN):
+	$(Q)echo CL mod: $(subst _clean,,$(notdir $@))
+	$(Q)$(MAKE) BUILD_OUTPUT_PATH=${BUILD_OUTPUT_PATH}/$(subst _clean,,$@) -C ./$(subst _clean,,$@) clean
+
+$(SUB_INSTALL):
+	$(Q)echo IN mod: $(subst _install,,$(notdir $@))
+	$(Q)$(MAKE) BUILD_OUTPUT_PATH=${BUILD_OUTPUT_PATH}/$(subst _install,,$@) -C ./$(subst _install,,$@) install
+
+$(SUB_VER):
+	$(Q)$(MAKE) BUILD_OUTPUT_PATH=${BUILD_OUTPUT_PATH}/$(subst _version,,$@) -C ./$(subst _version,,$@) version
+
+else
+
+# make for one sub: version default
+# source files
+SO_DJSON = $(wildcard *_dynamic.json)
+SO_SJSON = $(wildcard *_static.json)
+SO_SRC = $(addsuffix _calibration.c,$(TARGET))
+
+SO_SRCS = $(addprefix ${BUILD_OUTPUT_PATH}/,$(SO_SRC))
+SO_OBJS = $(SO_SRCS:.c=.o)
+
+# parse version
+SO_VERSION = $(shell [ -f $(SO_DJSON) ] && cat ${SO_DJSON} |grep -A 4 "CALIBRATION_VERSION_INFO" |grep "value" |awk -F ':' '{print $$2}' |sed -e 's/[ \t]*//g' -e 's/.*\[[0-9]*,//g' -e 's/\].*//g' -e 's/,/./g')
+SO_VERSION_MAJOR := $(basename $(basename $(SO_VERSION)))
+SO_VERSION_MINOR := $(subst .,,$(suffix $(basename $(SO_VERSION))))
+SO_VERSION_PATCH := $(subst .,,$(suffix $(SO_VERSION)))
+
+# builid params
+INCS := -I../../../_common $(INCS)
+CFLAGS += $(INCS)
+
+CFLAGS += -fPIC
+LIBS += -lpthread -lm
+
+CFLAGS += -Wno-missing-braces
+CFLAGS += -Wno-unused-variable
+CFLAGS += -Wno-pointer-sign
+#CFLAGS += -Wno-implicit-function-declaration
+CFLAGS += -Wno-unused-function
+CFLAGS += -Wno-unused-but-set-variable
+CFLAGS += -Wno-sizeof-pointer-memaccess
+CFLAGS += -fno-strict-aliasing
+
+# target macro
+CFLAGS_THIS = -DTARGET=\"${TARGET}\"
+CFLAGS_THIS += -DVERSION=\"${SO_VERSION}\"
+CFLAGS_THIS += -DSO_VERSION_MAJOR=$(SO_VERSION_MAJOR) -DSO_VERSION_MINOR=$(SO_VERSION_MINOR) -DSO_VERSION_PATCH=$(SO_VERSION_PATCH)
+
+# calibratio json to so.
+# target files
+SO_TARGET = lib_$(TARGET).so
+SO_MD5 = lib_$(TARGET).md5
+SO_NAME = ${BUILD_OUTPUT_PATH}/$(SO_TARGET)
+SO_NAMEV = $(SO_NAME).$(SO_VERSION_MAJOR)
+SO_NAMEVER = $(SO_NAME).$(SO_VERSION)
+
+# j2cf tools path
+J2CF_EXEC = $(abspath ../../../_common/j2cf)
+
+# output files for clean
+OUTS = $(SO_NAMEVER) $(SO_NAMEV) $(SO_NAME) $(SO_OBJS) $(SO_SRCS) $(SO_MD5)
+
+.PHONY: all all_32 clean install version $(SUB_LIST) $(SUB_CLEAN) $(SUB_VER)
+
+# all all_32: $(SO_NAME) $(SUB_LIST) $(SO_MD5)
+all all_32: $(SO_NAME) $(SUB_LIST)
+
+$(SO_NAMEVER): $(SO_OBJS)
+	$(Q)mkdir -p $(abspath $(dir $@))
+	$(Q)echo CC $@
+	$(CC) $(CFLAGS_DYNAMIC) $^ $(LDFLAGS) $(LIBS) -o $@
+
+$(SO_MD5): $(SO_NAMEVER)
+	$(Q)echo GEN $@
+	$(Q)md5sum $^ |sed -e 's/\/.*\///' > $@
+
+$(SO_SRCS): $(SO_DJSON) $(SO_SJSON) $(J2CF_EXEC)
+	$(Q)mkdir -p $(abspath $(dir $@))
+	$(Q)echo GEN $@
+	$(Q)$(J2CF_EXEC) $(addprefix -d ,$(SO_DJSON)) $(addprefix -s ,$(SO_SJSON)) -n $(TARGET) -o $@
+
+${BUILD_OUTPUT_PATH}/%.o: ${BUILD_OUTPUT_PATH}/%.c
+	$(Q)mkdir -p $(abspath $(dir $@))
+	$(Q)echo CC $@
+	$(CC) $(CFLAGS) $(CFLAGS_THIS) $(INCS) -c $< -o $@
+
+$(SO_NAMEV): $(SO_NAMEVER)
+	$(Q)echo LN $@
+	$(Q)ln -sf $(notdir $^) $@
+
+$(SO_NAME): $(SO_NAMEV)
+	$(Q)echo LN $@
+	$(Q)ln -sf $(notdir $^) $@
+
+clean:
+	$(Q)echo CLEAN $(notdir $(OUTS))
+	$(Q)rm -fr ${OUTS}
+
+install: $(SO_NAME)
+ifeq ($(HB_PKG_LIBCAM_RUNTIME_DEB)$(suffix $(SO_TARGET)), y.so)
+	$(Q)echo INS RUN $(notdir $(SO_NAMEVER) $(SO_NAMEV))
+	$(Q)install -d ${MODULE_RUNTIME_DIR}/usr/hobot/lib/sensor
+	$(Q)install $(SO_NAMEVER) ${MODULE_RUNTIME_DIR}/usr/hobot/lib/sensor
+	$(Q)ln -srf ${MODULE_RUNTIME_DIR}/usr/hobot/lib/sensor/$(notdir $(SO_NAMEVER)) \
+		${MODULE_RUNTIME_DIR}/usr/hobot/lib/sensor/$(notdir $(SO_NAMEV))
+	$(Q)ln -srf ${MODULE_RUNTIME_DIR}/usr/hobot/lib/sensor/$(notdir $(SO_NAMEVER)) \
+		${MODULE_RUNTIME_DIR}/usr/hobot/lib/sensor/$(notdir $(SO_NAME))
+endif
+ifeq ($(HB_PKG_LIBCAM_DEV_DEB), y)
+	$(Q)echo INS DEV $(notdir $(SO_NAMEVER) $(SO_NAMEV) $(SO_NAME))
+	$(Q)install -d ${MODULE_DEV_DIR}/usr/hobot/lib/sensor
+	$(Q)install $(SO_NAMEVER) ${MODULE_DEV_DIR}/usr/hobot/lib/sensor
+	$(Q)ln -srf ${MODULE_DEV_DIR}/usr/hobot/lib/sensor/$(notdir $(SO_NAMEVER)) \
+		${MODULE_DEV_DIR}/usr/hobot/lib/sensor/$(notdir $(SO_NAMEV))
+	$(Q)ln -srf ${MODULE_DEV_DIR}/usr/hobot/lib/sensor/$(notdir $(SO_NAMEV)) \
+		${MODULE_DEV_DIR}/usr/hobot/lib/sensor/$(notdir $(SO_NAME))
+endif
+
+version:
+	$(Q)echo VER $(TARGET): $(SO_TARGET) $(SO_VERSION)
+
+endif

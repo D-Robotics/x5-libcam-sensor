@@ -1,0 +1,311 @@
+#!/bin/sh
+
+module_no="S10E02C04"
+module_type="sensor"
+makefille_file="Makefile"
+version_file="version.mk"
+version_def="1.0.0"
+
+if [ -z "$1" ]; then
+	cat <<EOF
+$(basename $0) <$module_type> [version] [force] - create a new $module_type with version
+  $module_type - new $module_type name for lib<$module_type>.so
+  version - the version for this $module_type, default ${version_def}
+  force   - create or update force, be careful!
+eg: new xyz 0.0.1 -- create libxyz.so.0.0.1 $module_type
+    new xyz 1.1.0 -- update libxyz.so.1.1.0 version
+EOF
+	exit 0
+else
+	module=$1
+fi
+
+if [ -z "$2" ]; then
+	version=${version_def}
+else
+	version=$2
+	ver_set=y
+fi
+
+if [ ! -z "$3" ]; then
+	force=y
+fi
+
+# gen dir for module
+# $1 - module name
+gen_dir()
+{
+	if [ ! -z "$1" ] && [ ! -d "$1" ]; then
+		mkdir -p $1
+	fi
+}
+
+# gen Makefile for module
+# $1 - module name
+gen_makefile()
+{
+	makefile_f=$1/${makefille_file}
+	if [ -f "$makefile_f" ] && [ -z "$force" ]; then
+		echo "$makefile_f exist error"
+		exit 1
+	fi
+
+	echo "GEN $makefile_f"
+	cat <<EOF >$makefile_f
+-include ./version.mk
+
+ifeq (\${BUILD_OUTPUT_PATH},)
+export BUILD_OUTPUT_PATH=\$(shell pwd)
+endif
+
+TARGET = \$(notdir \$(shell pwd))
+
+ifneq (\${version},)
+upv = \$(TARGET)
+endif
+
+include ../Makefile
+EOF
+}
+
+# gen version.mk for module
+# $1 - module name
+gen_version()
+{
+	version_f=$1/${version_file}
+	if [ -f "$version_f" ]; then
+		if [ -z "$ver_set" ] && [ -z "$force" ]; then
+			echo "$version_f exist error"
+			exit 1
+		else
+			v_major_o=$(cat $version_f |grep 'MAJOR' |awk -F '= ' '{print $2}')
+			v_minor_o=$(cat $version_f |grep 'MINOR' |awk -F '= ' '{print $2}')
+			v_patch_o=$(cat $version_f |grep 'PATCH' |awk -F '= ' '{print $2}')
+			v_update=y
+		fi
+	else
+		echo "GEN $version_f"
+	fi
+	# get ver
+	v_major=`echo $version |awk -F '.' '{print $1}'`
+	v_minor=`echo $version |awk -F '.' '{print $2}'`
+	v_patch=`echo $version |awk -F '.' '{print $3}'`
+	# get number
+	v_major=${v_major//[^0-9]/}
+	v_minor=${v_minor//[^0-9]/}
+	v_patch=${v_patch//[^0-9]/}
+	if [ -z "$v_major" ]; then
+		v_major=0
+	fi
+	if [ -z "$v_minor" ]; then
+		v_minor=0
+	fi
+	if [ -z "$v_patch" ]; then
+		v_patch=0
+	fi
+
+	if [ ! -z "$v_update" ]; then
+		echo "UPD $version_f: $v_major_o.$v_minor_o.$v_patch -> $v_major.$v_minor.$v_patch"
+		if [ -z "$force" ]; then
+			if [ $v_major -lt $v_major_o ]; then
+				echo "version major $v_major < $v_major_o error"
+				exit 1
+			elif [ $v_major -eq $v_major_o ]; then
+				if [ $v_minor -lt $v_minor_o ]; then
+					echo "version minor $v_minor < $v_minor_o error"
+					exit 1
+				elif [ $v_minor -eq $v_minor_o ]; then
+					if [ $v_patch -lt $v_patch_o ]; then
+						echo "version patch $v_patch < $v_patch_o error"
+						exit 1
+					elif [ $v_patch -eq $v_patch_o ]; then
+						echo "version $v_major.$v_minor.$v_patch not need update"
+						return 0
+					fi
+				fi
+			fi
+		fi
+	fi
+
+	cat <<EOF > $version_f
+SO_VERSION_MAJOR = ${v_major}
+SO_VERSION_MINOR = ${v_minor}
+SO_VERSION_PATCH = ${v_patch}
+EOF
+}
+
+# gen source for module
+# $1 - module name
+gen_source()
+{
+	source_files=$(find $1 -maxdepth 1 -type f -name "*.c")
+	if [ ! -z "$source_files" ]; then
+		return 0
+	fi
+	source_f=$1/$1.c
+	echo "GEN $source_f"
+	cat <<EOF > $source_f
+/***************************************************************************
+ *                      COPYRIGHT NOTICE
+ *             Copyright 2020 Horizon Robotics, Inc.
+ *                     All rights reserved.
+ ***************************************************************************/
+
+/**
+ * @file $1.c
+ *
+ * @NO{$module_no}
+ * @ASIL{B}
+ */
+
+#define pr_fmt(fmt)		"[$1]:" fmt
+
+#include "hb_camera_error.h"
+
+#include "camera_log.h"
+
+#include "camera_mod_sensor.h"
+
+#define SENSOR_CUSTOM_EMODE_DATA \
+	int32_t custom_data
+
+#include "camera_mod_sensor_emdata.h"
+
+/**
+ * enum MODE_TYPE
+ * sensor extra_mode type index with flag char and attr
+ * @NO{$module_no}
+ */
+enum MODE_TYPE {
+	VENDOR_M24F120D12G3_S0R8T2,
+	MODE_TYPE_MAX,
+	MODE_TYPE_NUM,
+};
+
+/**
+ * @var emode_data
+ * the private data array for different extra_mode
+ */
+static emode_data_t emode_data[MODE_TYPE_MAX] = {
+	[VENDOR_M24F120D12G3_S0R8T2] = {
+		.serial_addr = 0x40,	// serial i2c addr
+		.sensor_addr = 0x10,	// sensor i2c addr
+		.eeprom_addr = 0x50,	// eeprom i2c addr
+	},
+};
+
+/**
+ * @var sensor_emode
+ * the extra_mode type struct array for different camera modules
+ */
+static const sensor_emode_type_t sensor_emode[MODE_TYPE_NUM] = {
+	SENSOR_EMADD(VENDOR_M24F120D12G3_S0R8T2, "0.0.1", "lib_$1_calib.so", "0.0.0.1", &emode_data[VENDOR_M24F120D12G3_S0R8T2]),
+	SENSOR_EMEND(),
+};
+
+static int32_t sensor_config_index_test_pattern(sensor_info_t *sensor_info)
+{
+	int32_t ret = RET_OK;
+
+	return ret;
+}
+
+/**
+ * @var sensor_config_index_funcs
+ * the config_index bit mask funcs array for different function
+ */
+static const sensor_config_func sensor_config_index_funcs[B_CONFIG_INDEX_MAX] = {
+	[B_TEST_PATTERN] = sensor_config_index_test_pattern,
+};
+
+/**
+ * @NO{$module_no}
+ * @ASIL{B}
+ * @brief sensor init operation: keep stream off after done
+ *
+ * @param[in] sensor_info: sensor module struct
+ *
+ * @return 0:Success, <0:Failure
+ */
+static int32_t sensor_init(sensor_info_t *sensor_info)
+{
+	int32_t ret = RET_OK;
+	cam_info("sensor%d i2c%d@0x%02x init as %d\\n", sensor_info->port,
+		sensor_info->bus_num, sensor_info->sensor_addr, sensor_info->dev_port);
+
+	return ret;
+}
+
+/**
+ * @NO{$module_no}
+ * @ASIL{B}
+ * @brief sensor start operation: stream on
+ *
+ * @param[in] sensor_info: sensor module struct
+ *
+ * @return 0:Success, <0:Failure
+ */
+static int32_t sensor_start(sensor_info_t *sensor_info)
+{
+	int32_t ret = RET_OK;
+	cam_info("sensor%d start\\n", sensor_info->port);
+
+	return ret;
+}
+
+/**
+ * @NO{$module_no}
+ * @ASIL{B}
+ * @brief sensor stop operation: stream off
+ *
+ * @param[in] sensor_info: sensor module struct
+ *
+ * @return 0:Success, <0:Failure
+ */
+static int32_t sensor_stop(sensor_info_t *sensor_info)
+{
+	int32_t ret = RET_OK;
+	cam_info("sensor%d stop\\n", sensor_info->port);
+
+	return ret;
+}
+
+/**
+ * @NO{$module_no}
+ * @ASIL{B}
+ * @brief sensor deinit operation: restore the status befor init
+ *
+ * @param[in] sensor_info: sensor module struct
+ *
+ * @return 0:Success, <0:Failure
+ */
+static int32_t sensor_deinit(sensor_info_t *sensor_info)
+{
+	int32_t ret = RET_OK;
+	cam_info("sensor%d deinit as %d\\n", sensor_info->port, sensor_info->dev_port);
+
+	return ret;
+}
+
+SENSOR_MODULE_EC($1, sensor_emode, sensor_config_index_funcs);
+sensor_module_t $1 = {
+	.module = SENSOR_MNAME($1),
+	.init = sensor_init,
+	.start = sensor_start,
+	.stop = sensor_stop,
+	.deinit = sensor_deinit,
+};
+EOF
+}
+
+# do
+gen_dir $module
+
+if [ -z "$ver_set" ] || [ ! -f "$module/$makefille_file" ]; then
+	gen_makefile $module
+fi
+
+gen_version $module
+
+gen_source $module
+
