@@ -246,7 +246,8 @@ int sc035hgs_linear_data_init(sensor_info_t *sensor_info)
 	 * trigger mode, we should use previous value: 1250, not 0x3fff
 	 * */
 	turning_data.sensor_data.lines_per_second = 37500;	//fps * vts = 30 * 1250 = 37500
-	turning_data.sensor_data.exposure_time_max = 1250;	//lines_per_second / fps = vts = 1250
+	// from customer, exposure max = 10ms, exposure_time_max = lines_per_second / 100 = 375
+	turning_data.sensor_data.exposure_time_max = 375;	// from customer
 	turning_data.sensor_data.exposure_time_min = 8;		// trigger mode, value read from 0x3226
 	// sensor AGC decided by 0x3e03
 #ifdef AE_DBG
@@ -455,10 +456,12 @@ static int sensor_aexp_gain_control(hal_control_info_t *info, uint32_t mode, uin
 		lower_again_reg_value = (sc035hgs_again_lut0[again_index] << 2) & 0x000000FF;
 		high_again_reg_value = sc035hgs_again_lut1[again_index] & 0x000000FF;
 		lower_dgain_reg_value = sc035hgs_dgain_lut0[dgain_index] & 0x000000FF;
-		high_dgain_reg_value = sc035hgs_again_lut1[dgain_index] & 0x000000FF;
-		//vin_info("%s again(0x3e08/0x3e09):%x,%x; dgain(0x3e06x3e07):%x,%x\n",
-		//		__FUNCTION__, lower_again_reg_value, high_again_reg_value, lower_dgain_reg_value,
-		//		high_dgain_reg_value);
+		high_dgain_reg_value = sc035hgs_dgain_lut1[dgain_index] & 0x000000FF;
+#ifdef AE_DBG
+		printf("%s again(0x3e08/0x3e09):%x,%x; dgain(0x3e06x3e07):%x,%x\n",
+				__FUNCTION__, lower_again_reg_value, high_again_reg_value, lower_dgain_reg_value,
+				high_dgain_reg_value);
+#endif
 
 		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, AGAIN_LOW, lower_again_reg_value);
 		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, AGAIN_HIGH, high_again_reg_value);
@@ -483,21 +486,20 @@ static int sensor_aexp_line_control(hal_control_info_t *info, uint32_t mode, uin
         const uint16_t EXP_LINE0 = 0x3e01;
 	const uint16_t EXP_LINE1 = 0x3e02;
 	char temp0 = 0, temp1 = 0;
-
         if (mode == NORMAL_M) {
 		uint32_t sline = line[0];
                 /*
                  * NOTICE: trigger mode: sline = line(from isp)
 		 * from sensor fae:
-		 * exposure_time_max =  1/fps - readout = 33ms->line = lines_per_second / 3 = 1250 * 10 = 12500
+		 * exposure_time_max =  1/fps - readout(480line) = 33ms- 480line = lines_per_second/30 - 480 = 1250 - 480 = 770
+		 * from customer, exposure time max is 10ms，sline = exposure_time_max = 375
                  */
 		if (sline < 8) {
 			sline = 8;
 		}
-		else if (sline > 12500) {
-			sline = 12500;
+		else if (sline > 375) {
+			sline = 375;
 		}
-
 		temp0 = (sline >> 4) & 0xFF;
 		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, EXP_LINE0, temp0);
                 temp1 = (sline & 0x0F) << 4; //bit[7:4]
@@ -517,7 +519,6 @@ static int sensor_userspace_control(uint32_t port, uint32_t *enable)
 {
 	vin_info("enable userspace gain control and line control\n");
 	*enable = HAL_GAIN_CONTROL | HAL_LINE_CONTROL;
-	//*enable = HAL_LINE_CONTROL;	//NOTICE
 	//*enable = 0;
 	return 0;
 }
