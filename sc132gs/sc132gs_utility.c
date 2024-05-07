@@ -24,6 +24,9 @@
 
 #define MCLK (24000000)
 
+//#define AE_DBG
+
+
 #define SC1320GS_PROGRAM_GAIN	(0x3e08)
 #define SC132GS_DIGITAL_GAIN	(0x3e06)
 #define SC132GS_EXP_LINE		(0x3e00)
@@ -51,11 +54,11 @@ int sc132gs_linear_data_init_896x896(sensor_info_t *sensor_info)
 		sizeof(turning_data.sensor_name));
 
 	// turning sensor_data
-	// lines_per_second = fps * vts, vts = {16‘h320e,16’h320f}
+	// lines_per_second = fps * vts, vts = {16‘h320e,16’h320f} = 1400
 	// If trigger is enabled, the configuration before trigger will still be used.
-	turning_data.sensor_data.lines_per_second = 14000;
-	// Default： exposure_time_max = vts
-	turning_data.sensor_data.exposure_time_max = 1400;
+	turning_data.sensor_data.lines_per_second = 42000;
+	// form customer, exposure time max = 10ms
+	turning_data.sensor_data.exposure_time_max = 420;
 
 	turning_data.sensor_data.active_width = 896;
 	turning_data.sensor_data.active_height = 896;
@@ -261,11 +264,11 @@ int sc132gs_linear_data_init_1088x1280(sensor_info_t *sensor_info)
 		sizeof(turning_data.sensor_name));
 
 	// turning sensor_data
-	// lines_per_second = fps * vts, vts = {16‘h320e,16’h320f}
+	// lines_per_second = fps * vts, vts = {16‘h320e,16’h320f} = 1400
 	// If trigger is enabled, the configuration before trigger will still be used.
-	turning_data.sensor_data.lines_per_second = 14000;
-	// Default： exposure_time_max = vts
-	turning_data.sensor_data.exposure_time_max = 1400;
+	turning_data.sensor_data.lines_per_second = 42000;
+	// form customer, exposure time max = 10ms
+	turning_data.sensor_data.exposure_time_max = 420;
 
 	turning_data.sensor_data.active_width = 1088;
 	turning_data.sensor_data.active_height = 1280;
@@ -528,13 +531,15 @@ int sensor_deinit(sensor_info_t *sensor_info)
 
 static int sensor_aexp_gain_control(hal_control_info_t *info, uint32_t mode, uint32_t *again, uint32_t *dgain, uint32_t gain_num)
 {
-	//vin_info("%s %s mode:%d gain_num:%d again[0]:%x, dgain[0]:%x\n", __FILE__, __FUNCTION__, mode, gain_num, again[0], dgain[0]);
+#ifdef AE_DBG
+	printf("%s %s mode:%d gain_num:%d again[0]:%x, dgain[0]:%x\n", __FILE__, __FUNCTION__, mode, gain_num, again[0], dgain[0]);
+#endif
 	const uint16_t AGAIN_LOW = 0x3e08;
 	const uint16_t AGAIN_HIGH = 0x3e09;
 	const uint16_t DGAIN_LOW = 0x3e06;
 	const uint16_t DGAIN_HIGH = 0x3e07;
-	char lower_again_reg_value = 0, high_again_reg_value = 0;
-	char lower_dgain_reg_value = 0, high_dgain_reg_value = 0;
+	char ana_gain = 0, ana_fine_gain = 0;
+	char dig_gain = 0, dig_fine_gain = 0;
 	int again_index = 0, dgain_index = 0;
 	if (mode == NORMAL_M || mode == DOL2_M) {
 		if (again[0] >= sizeof(sc132gs_gain_lut)/sizeof(uint32_t))
@@ -547,23 +552,24 @@ static int sensor_aexp_gain_control(hal_control_info_t *info, uint32_t mode, uin
 		else
 			dgain_index = dgain[0];
 
-		lower_again_reg_value = sc132gs_gain_lut[again_index] & 0x000000FF;
-		high_again_reg_value = (sc132gs_gain_lut[again_index] >> 8) & 0x000000FF;
-		lower_dgain_reg_value = sc132gs_dgain_lut[dgain_index] & 0x000000FF;
-		high_dgain_reg_value = (sc132gs_dgain_lut[dgain_index] >> 8) & 0x000000FF;
-		//vin_info("%s again(0x3e08/0x3e09):%x,%x; dgain(0x3e06x3e07):%x,%x\n",
-		//		__FUNCTION__, lower_again_reg_value, high_again_reg_value, lower_dgain_reg_value,
-		//		high_dgain_reg_value);
+		ana_gain = (sc132gs_gain_lut[again_index] >> 8) & 0x000000FF;
+		ana_fine_gain = sc132gs_gain_lut[again_index] & 0x000000FF;
 
-		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, AGAIN_LOW, lower_again_reg_value);
-		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, AGAIN_HIGH, high_again_reg_value);
-		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, DGAIN_LOW, lower_dgain_reg_value);
-		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, DGAIN_HIGH, high_dgain_reg_value);
+		dig_gain = (sc132gs_dgain_lut[dgain_index] >> 8) & 0x000000FF;
+		dig_fine_gain = sc132gs_dgain_lut[dgain_index] & 0x000000FF;
+#ifdef AE_DBG
+		printf("%s again(0x3e08/0x3e09):%x,%x; dgain(0x3e06x3e07):%x,%x\n",
+				__FUNCTION__, ana_gain, ana_fine_gain, dig_gain, dig_fine_gain);
+#endif
+		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, AGAIN_LOW, ana_gain);
+		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, AGAIN_HIGH, ana_fine_gain);
+		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, DGAIN_LOW, dig_gain);
+		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, DGAIN_HIGH, dig_fine_gain);
 		if (mode == DOL2_M) {
-			vin_i2c_write8(info->bus_num, 16, info->sensor_addr, 0x3e12, lower_again_reg_value);
-			vin_i2c_write8(info->bus_num, 16, info->sensor_addr, 0x3e13, high_again_reg_value);
-			vin_i2c_write8(info->bus_num, 16, info->sensor_addr, 0x3e10, lower_dgain_reg_value);
-			vin_i2c_write8(info->bus_num, 16, info->sensor_addr, 0x3e11, high_dgain_reg_value);
+			vin_i2c_write8(info->bus_num, 16, info->sensor_addr, 0x3e12, ana_gain);
+			vin_i2c_write8(info->bus_num, 16, info->sensor_addr, 0x3e13, ana_fine_gain);
+			vin_i2c_write8(info->bus_num, 16, info->sensor_addr, 0x3e10, dig_gain);
+			vin_i2c_write8(info->bus_num, 16, info->sensor_addr, 0x3e11, dig_fine_gain);
 		}
 
 	} else	{
@@ -572,10 +578,8 @@ static int sensor_aexp_gain_control(hal_control_info_t *info, uint32_t mode, uin
 
 	return 0;
 }
-
-static int sensor_aexp_line_control(hal_control_info_t *info, uint32_t mode, uint32_t *line, uint32_t line_num)
+static int sc132gs_ae_set(uint32_t bus, uint32_t addr, uint32_t line)
 {
-	//vin_info(" line mode %d, --line %d , line_num:%d \n", mode, line[0], line_num);
 	const uint16_t EXP_LINE0 = 0x3e00;
 	const uint16_t EXP_LINE1 = 0x3e01;
 	const uint16_t EXP_LINE2 = 0x3e02;
@@ -583,40 +587,58 @@ static int sensor_aexp_line_control(hal_control_info_t *info, uint32_t mode, uin
 	const uint16_t S_EXP_LINE1 = 0x3e05;
 	char temp0 = 0, temp1 = 0, temp2 = 0;
 
+	uint32_t sline = line;
+	/*
+	 * NOTICE: trigger mode: sline = line(from isp)
+	 * from customer, exposure time max is 10ms，sline = exposure_time_max = 420
+	 */
+	if (sline >= 420)
+		sline = 420;
 
-		if (mode == NORMAL_M) {
-		uint32_t sline = line[0];
-		if ( sline > 1046){
-			sline = 1046;
-		}
+	temp0 = (sline & 0xF000) >> 12;
+	temp1 = (sline & 0xFF0) >> 4;
+	temp2 = (sline & 0x0F) << 4;
+	vin_i2c_write8(bus, 16, addr, EXP_LINE0, temp0);
+	vin_i2c_write8(bus, 16, addr, EXP_LINE1, temp1);
+	vin_i2c_write8(bus, 16, addr, EXP_LINE2, temp2);
 
-		temp0 = (sline & 0xF000) >> 12;
-		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, EXP_LINE0, temp0);
-		temp1 = (sline & 0xFF0) >> 4;
-				vin_i2c_write8(info->bus_num, 16, info->sensor_addr, EXP_LINE1, temp1);
-				temp2 = (sline & 0x0F) << 4;
-				vin_i2c_write8(info->bus_num, 16, info->sensor_addr, EXP_LINE2, temp2);
+#ifdef AE_DBG
+	printf("%s sline = %d, 0x3e00 = %x, 0x3e01 = %x, 0x3e02 = %x \n",
+		__FUNCTION__, sline, temp0, temp1, temp2);
+#endif
+
+	return 0;
+}
+
+#define SAMPLECNT 8
+static uint32_t sc132gs_line_agv(uint32_t line)
+{
+	uint32_t average, i;
+	uint64_t sum = 0;
+	static uint32_t sample_ae[SAMPLECNT];
+	static uint32_t index = 0;
+	sample_ae[index++] = line;
+	if (index == SAMPLECNT)
+		index = 0;
+	for (i = 0; i < SAMPLECNT; i++)
+		sum += sample_ae[i];
+
+	average = sum / SAMPLECNT;
+	return average;
+}
+static int sensor_aexp_line_control(hal_control_info_t *info, uint32_t mode, uint32_t *line, uint32_t line_num)
+{
+#ifdef AE_DBG
+	printf(" line mode %d, --line %d , line_num:%d \n", mode, line[0], line_num);
+#endif
+	uint32_t val;
+
+
+	if (mode == NORMAL_M) {
+		val = sc132gs_line_agv(line[0]);
+		sc132gs_ae_set(info->bus_num, info->sensor_addr, val);
 	} else if (mode == DOL2_M) {
-		//vin_err(" line mode %d, line0 %u , line1: %u, line_num:%d \n", mode, line[0], line[1], line_num);
-		uint32_t lline = line[1];
-		if ( lline > 1870) {
-			lline = 1870;
-		}
-		temp0 = (lline & 0xF000) >> 12;
-		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, EXP_LINE0, temp0);
-		temp1 = (lline & 0xFF0) >> 4;
-		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, EXP_LINE1, temp1);
-		temp2 = (lline & 0x0F) << 4;
-		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, EXP_LINE2, temp2);
-
-		uint32_t sline = line[0];
-		if ( sline > 116) {
-			sline = 116;
-		}
-		temp0 = (sline & 0xFF0) >> 4;
-		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, S_EXP_LINE0, temp0);
-		temp1 = (sline & 0x0F) << 4;
-		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, S_EXP_LINE1, temp1);
+		//todo
 	} else {
 		vin_err(" unsupport mode %d\n", mode);
 	}
@@ -627,8 +649,7 @@ static int sensor_aexp_line_control(hal_control_info_t *info, uint32_t mode, uin
 static int sensor_userspace_control(uint32_t port, uint32_t *enable)
 {
 	vin_info("enable userspace gain control and line control\n");
-	// *enable = HAL_GAIN_CONTROL | HAL_LINE_CONTROL;
-	*enable = 0;
+	*enable = HAL_GAIN_CONTROL | HAL_LINE_CONTROL;
 	return 0;
 }
 
