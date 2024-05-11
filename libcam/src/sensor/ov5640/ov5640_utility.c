@@ -193,18 +193,18 @@ int sensor_init(sensor_info_t *sensor_info)
                 pr_err("%s format 0x%02x is not support now!\n", sensor_info->sensor_name, sensor_info->format);
         }
 
-        hb_vin_i2c_write_reg16_data8(sensor_info->bus_num, sensor_info->sensor_addr,
-                        OV5640_TPG_CTRL, 0x80);
-        if (sensor_info->format == 0x2b) {
-                hb_vin_i2c_write_reg16_data8(sensor_info->bus_num, sensor_info->sensor_addr,
-                                OV5640_TPG_SET, 0x04);
-        } else if (sensor_info->format == 0x2a || sensor_info->format == 0x1c || sensor_info->format == 0x1e) {
-                hb_vin_i2c_write_reg16_data8(sensor_info->bus_num, sensor_info->sensor_addr,
-                                OV5640_TPG_SET, 0x05);
-        } else {
-                pr_err("%s: Unsupported output format %d!\n", __func__, sensor_info->format);
-                return -1;
-        }
+        // hb_vin_i2c_write_reg16_data8(sensor_info->bus_num, sensor_info->sensor_addr,
+        //                 OV5640_TPG_CTRL, 0x80);
+        // if (sensor_info->format == 0x2b) {
+        //         hb_vin_i2c_write_reg16_data8(sensor_info->bus_num, sensor_info->sensor_addr,
+        //                         OV5640_TPG_SET, 0x04);
+        // } else if (sensor_info->format == 0x2a || sensor_info->format == 0x1c || sensor_info->format == 0x1e) {
+        //         hb_vin_i2c_write_reg16_data8(sensor_info->bus_num, sensor_info->sensor_addr,
+        //                         OV5640_TPG_SET, 0x05);
+        // } else {
+        //         pr_err("%s: Unsupported output format %d!\n", __func__, sensor_info->format);
+        //         return -1;
+        // }
 
         ret = ov5640_linear_data_init(sensor_info);
         if (ret < 0) {
