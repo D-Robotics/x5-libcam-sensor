@@ -620,25 +620,25 @@ int32_t camera_sensor_config_parse(camera_handle_st *hcam, sensor_info_t *sen_if
 	sen_if->sensor_mode = cfg->sensor_mode;
 #ifdef CAM_CONFIG_INFO_LEGACY_COMPATIBLE
 	sen_if->gpio_num = 0;
-	if (cfg->gpio_enable != 0U) {
+	if (cfg->gpio_enable_bit != 0U) {
 		if ((vcon->attr_valid & VCON_ATTR_V_GPIO_OTH) == 0) {
 			cam_err("vcon no valid oth 0x%x gpio attr error\n",
-				cfg->gpio_enable);
+				cfg->gpio_enable_bit);
 			return -RET_ERROR;
 		}
 		for (i = VGPIO_OTH_BASE; i < (VGPIO_OTH_BASE + VGPIO_OTH_NUM); i++) {
-			if ((cfg->gpio_enable & BIT(i - VGPIO_OTH_BASE)) == 0U)
+			if ((cfg->gpio_enable_bit & BIT(i - VGPIO_OTH_BASE)) == 0U)
 				continue;
 			if (vcon->gpios[i] != 0) {
 				sen_if->gpio_pin[sen_if->gpio_num] = vcon->gpios[i];
 				sen_if->gpio_level[sen_if->gpio_num] =
-				    (cfg->gpio_level & BIT(i - VGPIO_OTH_BASE)) ? 1 : 0;
+				    (cfg->gpio_level_bit & BIT(i - VGPIO_OTH_BASE)) ? 1 : 0;
 				sen_if->gpio_num++;
 			}
 		}
 		if (sen_if->gpio_num == 0) {
 			cam_warn("vcon no such oth 0x%x gpio attr\n",
-				cfg->gpio_enable);
+				cfg->gpio_enable_bit);
 		}
 	}
 #endif
