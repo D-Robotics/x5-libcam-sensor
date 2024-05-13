@@ -143,8 +143,8 @@ typedef struct camera_config_s {
 	uint32_t serial_addr;	// seriala设备地址(如有)
 	uint32_t sensor_mode;	// 模式选址: Linear/PWL
 	uint32_t sensor_clk;	// sensor的clk时钟配置
-	uint32_t gpio_enable;	// GPIO操作使能，索引自VCON
-	uint32_t gpio_level;	// GPIO操作状态，工作状态
+	uint32_t gpio_enable_bit;	// GPIO操作使能，索引自VCON
+	uint32_t gpio_level_bit;	// GPIO操作状态，工作状态
 	uint32_t bus_select;	// I2C的选择，索引自VCON
 	uint32_t bus_timeout;	// I2C的timeout时间配置
 	uint32_t fps;		// 帧率
@@ -170,8 +170,8 @@ typedef struct camera_config_s {
 typedef struct poc_config_s {
 	char name[CAMERA_MODULE_NAME_LEN];// poc名称: max20087/...
 	uint32_t addr;		// poc设备地址
-	uint32_t gpio_enable;	// GPIO操作使能，索引自VCON
-	uint32_t gpio_level;	// GPIO操作状态，工作状态
+	uint32_t gpio_enable_bit;	// GPIO操作使能，索引自VCON
+	uint32_t gpio_level_bit;	// GPIO操作状态，工作状态
 	uint32_t poc_map;	// poc与link的map关系
 	uint32_t power_delay;	// poc开关操作的delay时间
 	uint32_t end_flag;	// end flag of config struct.
@@ -185,8 +185,8 @@ typedef struct poc_config_s {
 typedef struct deserial_config_s {
 	char name[CAMERA_MODULE_NAME_LEN];// deserial名称: max9296/...
 	uint32_t addr;		// deserial设备地址
-	uint32_t gpio_enable;	// GPIO操作使能，索引自VCON
-	uint32_t gpio_level;	// GPIO操作状态，工作状态
+	uint32_t gpio_enable_bit;	// GPIO操作使能，索引自VCON
+	uint32_t gpio_level_bit;	// GPIO操作状态，工作状态
 	uint8_t gpio_mfp[CAMERA_DES_GPIO_MAX];	// MFP的GPIO功能选择
 	uint32_t bus_select;	// I2C的选择，索引自VCON
 	uint32_t bus_timeout;	// I2C的timeout时间配置
@@ -210,8 +210,8 @@ typedef struct deserial_config_s {
 typedef struct txser_config_s {
 	char name[CAMERA_MODULE_NAME_LEN]; // txser名称: max9296/...
 	uint32_t addr;		// txser设备地址
-	uint32_t gpio_enable;	// GPIO操作使能，索引自VCON
-	uint32_t gpio_level;	// GPIO操作状态，工作状态
+	uint32_t gpio_enable_bit;	// GPIO操作使能，索引自VCON
+	uint32_t gpio_level_bit;	// GPIO操作状态，工作状态
 	uint8_t gpio_mfp[CAMERA_DES_GPIO_MAX];	// MFP的GPIO功能选择
 	uint32_t bus_select;	// I2C的选择，索引自VCON
 	uint32_t bus_timeout;	// I2C的timeout时间配置

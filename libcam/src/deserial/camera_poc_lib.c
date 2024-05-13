@@ -307,25 +307,25 @@ int32_t camera_poc_config_parse(deserial_handle_st *hdes, poc_info_t *poc_if)
 	poc_if->poc_addr = cfg->addr;
 #ifdef CAM_CONFIG_INFO_LEGACY_COMPATIBLE
 	poc_if->gpio_num = 0;
-	if (cfg->gpio_enable != 0U) {
+	if (cfg->gpio_enable_bit != 0U) {
 		if ((vcon->attr_valid & VCON_ATTR_V_GPIO_POC) == 0) {
 			cam_err("vcon no valid poc 0x%x gpio attr error\n",
-				cfg->gpio_enable);
+				cfg->gpio_enable_bit);
 			return -RET_ERROR;
 		}
 		for (i = VGPIO_POC_BASE; i < VGPIO_POC_NUM; i++) {
-			if ((cfg->gpio_enable & BIT(i - VGPIO_POC_BASE)) == 0)
+			if ((cfg->gpio_enable_bit & BIT(i - VGPIO_POC_BASE)) == 0)
 				continue;
 			if (vcon->gpios[i] != 0) {
 				poc_if->gpio_pin[poc_if->gpio_num] = vcon->gpios[i];
 				poc_if->gpio_level[poc_if->gpio_num] =
-				    (cfg->gpio_level & BIT(i - VGPIO_POC_BASE)) ? 1 : 0;
+				    (cfg->gpio_level_bit & BIT(i - VGPIO_POC_BASE)) ? 1 : 0;
 				poc_if->gpio_num++;
 			}
 		}
 		if (poc_if->gpio_num == 0) {
 			cam_warn("vcon no such poc 0x%x gpio attr\n",
-				cfg->gpio_enable);
+				cfg->gpio_enable_bit);
 		}
 	}
 #endif

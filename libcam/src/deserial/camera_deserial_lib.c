@@ -327,25 +327,25 @@ int32_t camera_deserial_config_parse(deserial_handle_st *hdes, deserial_info_t *
 	des_if->lane_speed = cfg->lane_speed;
 #ifdef CAM_CONFIG_INFO_LEGACY_COMPATIBLE
 	des_if->gpio_num = 0;
-	if ((cfg->gpio_enable != 0U) && ((cfg->gpio_enable & BIT(31)) != 0U)) {
+	if ((cfg->gpio_enable_bit != 0U) && ((cfg->gpio_enable_bit & BIT(31)) != 0U)) {
 		if ((vcon->attr_valid & VCON_ATTR_V_GPIO_DES) == 0) {
 			cam_err("vcon no valid des 0x%x gpio attr error\n",
-				cfg->gpio_enable);
+				cfg->gpio_enable_bit);
 			return -RET_ERROR;
 		}
 		for (i = VGPIO_DES_BASE; i < (VGPIO_DES_BASE + VGPIO_DES_NUM); i++) {
-			if ((cfg->gpio_enable & BIT(i - VGPIO_DES_BASE)) == 0U)
+			if ((cfg->gpio_enable_bit & BIT(i - VGPIO_DES_BASE)) == 0U)
 				continue;
 			if (vcon->gpios[i] != 0) {
 				des_if->gpio_pin[des_if->gpio_num] = vcon->gpios[i];
 				des_if->gpio_level[des_if->gpio_num] =
-				    (cfg->gpio_level & BIT(i - VGPIO_DES_BASE)) ? 1 : 0;
+				    (cfg->gpio_level_bit & BIT(i - VGPIO_DES_BASE)) ? 1 : 0;
 				des_if->gpio_num++;
 			}
 		}
 		if (des_if->gpio_num == 0) {
 			cam_warn("vcon no such des 0x%x gpio attr\n",
-				cfg->gpio_enable);
+				cfg->gpio_enable_bit);
 		}
 	}
 #endif
@@ -376,8 +376,8 @@ int32_t camera_deserial_config_parse(deserial_handle_st *hdes, deserial_info_t *
 	}
 	des_if->reset_delay = cfg->reset_delay;
 	des_if->deserial_attr = cfg->flags;
-	des_if->gpio_enable = cfg->gpio_enable;
-	des_if->gpio_levels = cfg->gpio_level;
+	des_if->gpio_enable = cfg->gpio_enable_bit;
+	des_if->gpio_levels = cfg->gpio_level_bit;
 	for (i = 0; i < CAMERA_DES_GPIO_MAX; i++) {
 		if (cfg->gpio_mfp[i] < CAMERA_DES_MFPMAX)
 			des_if->deserial_gpio[i] = (int32_t)cfg->gpio_mfp[i];
