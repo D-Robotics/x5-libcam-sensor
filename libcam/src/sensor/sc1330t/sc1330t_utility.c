@@ -361,7 +361,7 @@ int sc1330t_dol2_data_init(sensor_info_t *sensor_info)
 	// turning_data.dol2.m_line_length = 2;
 
         // raw10
-        sensor_data_bayer_fill(&turning_data.sensor_data, 10, (uint32_t)BAYER_START_R, (uint32_t)BAYER_PATTERN_RGGB);
+        sensor_data_bayer_fill(&turning_data.sensor_data, 10, (uint32_t)BAYER_START_B, (uint32_t)BAYER_PATTERN_RGGB);
         sensor_data_bits_fill(&turning_data.sensor_data, 12);
 
 
