@@ -159,7 +159,7 @@ int sensor_init(sensor_info_t *sensor_info)
         }
 
         if (sensor_info->format == 0x2c) {
-                hb_vin_i2c_write_reg16_data8(sensor_info->bus_num, sensor_info->sensor_addr, 0x031e, 0x08);
+                hb_vin_i2c_write_reg16_data8(sensor_info->bus_num, sensor_info->sensor_addr, 0x031e, 0x0a);
                 hb_vin_i2c_write_reg16_data8(sensor_info->bus_num, sensor_info->sensor_addr, 0x3600, 0x0);
                 hb_vin_i2c_write_reg16_data8(sensor_info->bus_num, sensor_info->sensor_addr, OS08A20_FMT_CTRL, 0xd3);
                 hb_vin_i2c_write_reg16_data8(sensor_info->bus_num, sensor_info->sensor_addr, 0x3706, 0x72);
@@ -187,7 +187,7 @@ int sensor_init(sensor_info_t *sensor_info)
                 hb_vin_i2c_write_reg16_data8(sensor_info->bus_num, sensor_info->sensor_addr, OS08A20_FMT_CTRL, 0x42);
         }
 
-        hb_vin_i2c_write_reg16_data8(sensor_info->bus_num, sensor_info->sensor_addr, OS08A20_TPG_CTRL, 0x80);
+        // hb_vin_i2c_write_reg16_data8(sensor_info->bus_num, sensor_info->sensor_addr, OS08A20_TPG_CTRL, 0x80);
 
         if (sensor_info->sensor_mode == DOL2_M) {
                 setting_size = sizeof(os08a20_dol2_settings) / sizeof(uint32_t) / 2;
