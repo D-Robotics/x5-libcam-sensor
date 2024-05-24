@@ -254,8 +254,8 @@ int sc035hgs_linear_data_init(sensor_info_t *sensor_info)
 	temp = hb_vin_i2c_read_reg16_data8(sensor_info->bus_num, sensor_info->sensor_addr, 0x3e03);
 	printf("%s read AGC 0x3e03 = 0x%x \n", __FUNCTION__, temp);
 #endif
-	turning_data.sensor_data.analog_gain_max = 15;		//from spec
-	turning_data.sensor_data.digital_gain_max = 8;		//from spec
+	turning_data.sensor_data.analog_gain_max = 127;		//from spec, gain lut index
+	turning_data.sensor_data.digital_gain_max = 95;		//from spec, gain lut index
 
         // raw10
         sensor_data_bayer_fill(&turning_data.sensor_data, 10, (uint32_t)BAYER_START_B, (uint32_t)BAYER_PATTERN_RGGB);
