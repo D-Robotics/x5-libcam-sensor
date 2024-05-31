@@ -376,14 +376,13 @@ int sc1330t_dol2_data_init(sensor_info_t *sensor_info)
 
 	// turning sensor_data
 	turning_data.sensor_data.turning_type = 6;
-	turning_data.sensor_data.lines_per_second = 60240;
+	turning_data.sensor_data.lines_per_second = 75000;	//vts*fps=2500*30=75000
 	turning_data.sensor_data.exposure_time_max = 968;
 
 	turning_data.sensor_data.active_width = 1280;
 	turning_data.sensor_data.active_height = 960;
-	// turning_data.sensor_data.gain_max = 128 * 8192;
-	turning_data.sensor_data.analog_gain_max = 205*8192;
-	turning_data.sensor_data.digital_gain_max = 159*8192;
+	turning_data.sensor_data.analog_gain_max = 205;
+	turning_data.sensor_data.digital_gain_max = 159;
 	turning_data.sensor_data.exposure_time_min = 1;
 	turning_data.sensor_data.exposure_time_long_max = 2176;
 	// turning_data.sensor_data.conversion = 1;
