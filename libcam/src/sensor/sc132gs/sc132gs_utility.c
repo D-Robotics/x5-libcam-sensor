@@ -62,8 +62,8 @@ int sc132gs_linear_data_init_896x896(sensor_info_t *sensor_info)
 
 	turning_data.sensor_data.active_width = 896;
 	turning_data.sensor_data.active_height = 896;
-	turning_data.sensor_data.analog_gain_max = 28;
-	turning_data.sensor_data.digital_gain_max = 32;   //159
+	turning_data.sensor_data.analog_gain_max = 154;
+	turning_data.sensor_data.digital_gain_max = 159;   //159
 	turning_data.sensor_data.exposure_time_min = 8;
 	// No setting is required in linear mode
 	turning_data.sensor_data.exposure_time_long_max = 4000;
@@ -124,6 +124,100 @@ int sc132gs_linear_data_init_896x896(sensor_info_t *sensor_info)
 
 	return ret;
 }
+
+// turning data init
+int sc132gs_linear_data_init_1088x1280(sensor_info_t *sensor_info)
+{
+	int ret = RET_OK;
+	uint32_t  open_cnt = 0;
+	sensor_turning_data_t turning_data;
+	uint32_t *stream_on = turning_data.stream_ctrl.stream_on;
+	uint32_t *stream_off = turning_data.stream_ctrl.stream_off;
+
+	memset(&turning_data, 0, sizeof(sensor_turning_data_t));
+
+	// common data
+	turning_data.bus_num = sensor_info->bus_num;
+	turning_data.bus_type = sensor_info->bus_type;
+	turning_data.port = sensor_info->port;
+	turning_data.reg_width = sensor_info->reg_width;
+	turning_data.mode = sensor_info->sensor_mode;
+	turning_data.sensor_addr = sensor_info->sensor_addr;
+	strncpy(turning_data.sensor_name, sensor_info->sensor_name,
+		sizeof(turning_data.sensor_name));
+
+	// turning sensor_data
+	// lines_per_second = fps * vts, vts = {16‘h320e,16’h320f} = 1400
+	// If trigger is enabled, the configuration before trigger will still be used.
+	turning_data.sensor_data.lines_per_second = 84000;
+	// form customer, exposure time max = 10ms
+	turning_data.sensor_data.exposure_time_max = 840;
+
+	turning_data.sensor_data.active_width = 1088;
+	turning_data.sensor_data.active_height = 1280;
+	turning_data.sensor_data.analog_gain_max = 63;		//154
+	turning_data.sensor_data.digital_gain_max = 0;   //159
+	turning_data.sensor_data.exposure_time_min = 8;
+	// No setting is required in linear mode
+	turning_data.sensor_data.exposure_time_long_max = 4000;
+
+	// raw10
+	sensor_data_bayer_fill(&turning_data.sensor_data, 10, (uint32_t)BAYER_START_B, (uint32_t)BAYER_PATTERN_RGGB);
+	sensor_data_bits_fill(&turning_data.sensor_data, 12);
+
+	turning_data.stream_ctrl.data_length = 1;
+	if(sizeof(turning_data.stream_ctrl.stream_on) >= sizeof(sc132gs_stream_on_setting)) {
+		memcpy(stream_on, sc132gs_stream_on_setting, sizeof(sc132gs_stream_on_setting));
+	} else {
+		vin_err("Number of registers on stream over 10\n");
+		return -RET_ERROR;
+	}
+	if(sizeof(turning_data.stream_ctrl.stream_off) >= sizeof(sc132gs_stream_off_setting)) {
+		memcpy(stream_off, sc132gs_stream_off_setting, sizeof(sc132gs_stream_off_setting));
+	} else {
+		vin_err("Number of registers on stream over 10\n");
+		return -RET_ERROR;
+	}
+
+	turning_data.normal.again_lut = malloc(256*sizeof(uint32_t));
+	if (turning_data.normal.again_lut != NULL) {
+		memset(turning_data.normal.again_lut, 0xff, 256*sizeof(uint32_t));
+		memcpy(turning_data.normal.again_lut, sc132gs_gain_lut,
+			sizeof(sc132gs_gain_lut));
+		for (open_cnt =0; open_cnt <
+			sizeof(sc132gs_gain_lut)/sizeof(uint32_t); open_cnt++) {
+				// DOFFSET(&turning_data.normal.again_lut[open_cnt], 2);
+		}
+	}
+
+	turning_data.normal.dgain_lut = malloc(256*sizeof(uint32_t));
+	if (turning_data.normal.dgain_lut != NULL) {
+		memset(turning_data.normal.dgain_lut, 0xff, 256*sizeof(uint32_t));
+		memcpy(turning_data.normal.dgain_lut, sc132gs_dgain_lut,
+			sizeof(sc132gs_dgain_lut));
+		for (open_cnt =0; open_cnt <
+			sizeof(sc132gs_dgain_lut)/sizeof(uint32_t); open_cnt++) {
+				// DOFFSET(&turning_data.normal.dgain_lut[open_cnt], 2);
+		}
+	}
+
+	ret = ioctl(sensor_info->sen_devfd, SENSOR_TURNING_PARAM, &turning_data);
+	if (turning_data.normal.again_lut) {
+		free(turning_data.normal.again_lut);
+		turning_data.normal.again_lut = NULL;
+	}
+	if (turning_data.normal.dgain_lut) {
+		free(turning_data.normal.dgain_lut);
+		turning_data.normal.dgain_lut = NULL;
+	}
+	if (ret < 0) {
+		vin_err("sensor_%d ioctl fail %d\n", ret);
+		return -RET_ERROR;
+	}
+
+	return ret;
+}
+
 
 int sc132gs_dol2_data_init_896x896(sensor_info_t *sensor_info)
 {
@@ -241,100 +335,6 @@ int sc132gs_dol2_data_init_896x896(sensor_info_t *sensor_info)
 	return ret;
 }
 
-
-// turning data init
-int sc132gs_linear_data_init_1088x1280(sensor_info_t *sensor_info)
-{
-	int ret = RET_OK;
-	uint32_t  open_cnt = 0;
-	sensor_turning_data_t turning_data;
-	uint32_t *stream_on = turning_data.stream_ctrl.stream_on;
-	uint32_t *stream_off = turning_data.stream_ctrl.stream_off;
-
-	memset(&turning_data, 0, sizeof(sensor_turning_data_t));
-
-	// common data
-	turning_data.bus_num = sensor_info->bus_num;
-	turning_data.bus_type = sensor_info->bus_type;
-	turning_data.port = sensor_info->port;
-	turning_data.reg_width = sensor_info->reg_width;
-	turning_data.mode = sensor_info->sensor_mode;
-	turning_data.sensor_addr = sensor_info->sensor_addr;
-	strncpy(turning_data.sensor_name, sensor_info->sensor_name,
-		sizeof(turning_data.sensor_name));
-
-	// turning sensor_data
-	// lines_per_second = fps * vts, vts = {16‘h320e,16’h320f} = 1400
-	// If trigger is enabled, the configuration before trigger will still be used.
-	turning_data.sensor_data.lines_per_second = 42000;
-	// form customer, exposure time max = 10ms
-	turning_data.sensor_data.exposure_time_max = 420;
-
-	turning_data.sensor_data.active_width = 1088;
-	turning_data.sensor_data.active_height = 1280;
-	turning_data.sensor_data.analog_gain_max = 28;
-	turning_data.sensor_data.digital_gain_max = 32;   //159
-	turning_data.sensor_data.exposure_time_min = 8;
-	// No setting is required in linear mode
-	turning_data.sensor_data.exposure_time_long_max = 4000;
-
-	// raw10
-	sensor_data_bayer_fill(&turning_data.sensor_data, 10, (uint32_t)BAYER_START_B, (uint32_t)BAYER_PATTERN_RGGB);
-	sensor_data_bits_fill(&turning_data.sensor_data, 12);
-
-	turning_data.stream_ctrl.data_length = 1;
-	if(sizeof(turning_data.stream_ctrl.stream_on) >= sizeof(sc132gs_stream_on_setting)) {
-		memcpy(stream_on, sc132gs_stream_on_setting, sizeof(sc132gs_stream_on_setting));
-	} else {
-		vin_err("Number of registers on stream over 10\n");
-		return -RET_ERROR;
-	}
-	if(sizeof(turning_data.stream_ctrl.stream_off) >= sizeof(sc132gs_stream_off_setting)) {
-		memcpy(stream_off, sc132gs_stream_off_setting, sizeof(sc132gs_stream_off_setting));
-	} else {
-		vin_err("Number of registers on stream over 10\n");
-		return -RET_ERROR;
-	}
-
-	turning_data.normal.again_lut = malloc(256*sizeof(uint32_t));
-	if (turning_data.normal.again_lut != NULL) {
-		memset(turning_data.normal.again_lut, 0xff, 256*sizeof(uint32_t));
-		memcpy(turning_data.normal.again_lut, sc132gs_gain_lut,
-			sizeof(sc132gs_gain_lut));
-		for (open_cnt =0; open_cnt <
-			sizeof(sc132gs_gain_lut)/sizeof(uint32_t); open_cnt++) {
-				// DOFFSET(&turning_data.normal.again_lut[open_cnt], 2);
-		}
-	}
-
-	turning_data.normal.dgain_lut = malloc(256*sizeof(uint32_t));
-	if (turning_data.normal.dgain_lut != NULL) {
-		memset(turning_data.normal.dgain_lut, 0xff, 256*sizeof(uint32_t));
-		memcpy(turning_data.normal.dgain_lut, sc132gs_dgain_lut,
-			sizeof(sc132gs_dgain_lut));
-		for (open_cnt =0; open_cnt <
-			sizeof(sc132gs_dgain_lut)/sizeof(uint32_t); open_cnt++) {
-				// DOFFSET(&turning_data.normal.dgain_lut[open_cnt], 2);
-		}
-	}
-
-	ret = ioctl(sensor_info->sen_devfd, SENSOR_TURNING_PARAM, &turning_data);
-	if (turning_data.normal.again_lut) {
-		free(turning_data.normal.again_lut);
-		turning_data.normal.again_lut = NULL;
-	}
-	if (turning_data.normal.dgain_lut) {
-		free(turning_data.normal.dgain_lut);
-		turning_data.normal.dgain_lut = NULL;
-	}
-	if (ret < 0) {
-		vin_err("sensor_%d ioctl fail %d\n", ret);
-		return -RET_ERROR;
-	}
-
-	return ret;
-}
-
 int sensor_poweroff(sensor_info_t *sensor_info)
 {
 	int gpio, ret = RET_OK;
@@ -436,12 +436,12 @@ int sensor_init(sensor_info_t *sensor_info)
 			ret = -RET_ERROR;
 			break;
 		}
-	} else if (sensor_info->width == 1088 && sensor_info->height == 1280) {
+	}else if (sensor_info->width == 1088 && sensor_info->height == 1280) {
 		switch(sensor_info->sensor_mode) {
 		case NORMAL_M:	  // 1: normal
 			vin_info("sc132gs in normal mode\n");
-			setting_size = sizeof(sc132gs_linear_init_1088x1280_10fps_setting) / sizeof(uint32_t) / 2;
-			ret = sensor_configure(sensor_info, sc132gs_linear_init_1088x1280_10fps_setting, setting_size);
+			setting_size = sizeof(sc132gs_linear_init_1088x1280_30fps_setting) / sizeof(uint32_t) / 2;
+			ret = sensor_configure(sensor_info, sc132gs_linear_init_1088x1280_30fps_setting, setting_size);
 			if (ret < 0) {
 				vin_err("%d : init %s fail\n", __LINE__, sensor_info->sensor_name);
 				return ret;
@@ -457,7 +457,7 @@ int sensor_init(sensor_info_t *sensor_info)
 			ret = -RET_ERROR;
 			break;
 		}
-	}
+	} 
 	vin_info("sc132gs config success under %d mode\n\n", sensor_info->sensor_mode);
 
 	return ret;
@@ -592,8 +592,8 @@ static int sc132gs_ae_set(uint32_t bus, uint32_t addr, uint32_t line)
 	 * NOTICE: trigger mode: sline = line(from isp)
 	 * from customer, exposure time max is 10ms，sline = exposure_time_max = 420
 	 */
-	if (sline >= 420)
-		sline = 420;
+	if (sline >= 840)
+		sline = 840;
 
 	temp0 = (sline & 0xF000) >> 12;
 	temp1 = (sline & 0xFF0) >> 4;
