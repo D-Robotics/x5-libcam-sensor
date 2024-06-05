@@ -87,6 +87,7 @@ int sensor_init(sensor_info_t *sensor_info)
 {
 	int ret = RET_OK;
 	int setting_size = 0;
+	const uint32_t *sc1330t_linear_init_setting;
 
 	ret = sensor_poweron(sensor_info);
 	if (ret < 0) {
@@ -98,7 +99,16 @@ int sensor_init(sensor_info_t *sensor_info)
         switch(sensor_info->sensor_mode) {
                 case NORMAL_M:	  // 1: normal
                         vin_info("sc1330 in normal mode\n");
-			setting_size = sizeof(sc1330t_linear_init_setting) / sizeof(uint32_t) / 2;
+			if (sensor_info->fps == 30) {
+				sc1330t_linear_init_setting = sc1330t_linear_init_30fps_setting;
+				setting_size = ARRAY_SIZE(sc1330t_linear_init_30fps_setting) / 2;
+			} else if (sensor_info->fps == 60) {
+				sc1330t_linear_init_setting = sc1330t_linear_init_60fps_setting;
+				setting_size = ARRAY_SIZE(sc1330t_linear_init_60fps_setting) / 2;
+			} else {
+				vin_err("unsupported fps setting\n");
+				return -RET_ERROR;
+			}
 			vin_info("sensor_name %s, setting_size = %d\n", sensor_info->sensor_name, setting_size);
                         vin_info("bus_num = %d, sensor_addr = 0x%0x \n", sensor_info->bus_num, sensor_info->sensor_addr);
 			ret = vin_write_array(sensor_info->bus_num, sensor_info->sensor_addr, 2,
