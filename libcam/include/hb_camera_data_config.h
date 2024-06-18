@@ -61,6 +61,30 @@ enum sensor_mode_e {
 };
 
 /**
+ * @enum sensor_format_e
+ * sensor device param of mipi format enum
+ */
+enum sensor_format_e {
+	DATA_TYPE_YUV420_8BIT = 0x18,
+	DATA_TYPE_YUV420_10BIT = 0x19,
+	DATA_TYPE_YUV422_8BIT = 0x1E,	//UYVY
+	DATA_TYPE_YUV422_10BIT = 0x1F,
+	DATA_TYPE_RGB444 = 0x20,
+	DATA_TYPE_RGB555 = 0x21,
+	DATA_TYPE_RGB565 = 0x22,
+	DATA_TYPE_RGB666 = 0x23,
+	DATA_TYPE_RGB888 = 0x24,
+	DATA_TYPE_RAW6 = 0x28,
+	DATA_TYPE_RAW7 = 0x29,
+	DATA_TYPE_RAW8 = 0x2A,
+	DATA_TYPE_RAW10 = 0x2B,
+	DATA_TYPE_RAW12 = 0x2C,
+	DATA_TYPE_RAW14 = 0x2D,
+	DATA_TYPE_RAW16 = 0x2E,
+	DATA_TYPE_RAW20 = 0x2F,
+};
+
+/**
  * @enum camera_des_mfp_e
  * camera deserial mfp index enum
  */
