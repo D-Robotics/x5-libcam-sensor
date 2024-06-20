@@ -1315,3 +1315,58 @@ int32_t camera_sensor_idev_get_version(calib_info_t *cal_if, sensor_version_info
 	return ret;
 }
 
+int32_t camera_sensor_isi_dev_open(camera_module_lib_t *cal_lib)
+{
+	int32_t ret = RET_OK;
+
+	if (cal_lib == NULL)
+		return -RET_ERROR;
+	if (cal_lib->so_fd > 0)
+		return RET_OK;
+
+	ret = open(SENSOR_IDEV_PATH, O_RDWR);
+	if (ret < 0) {
+		cam_err("open %s failed \n", SENSOR_IDEV_PATH);
+		return -RET_ERROR;
+	}
+
+	cal_lib->so_fd = ret;
+
+	return RET_OK;
+}
+
+int32_t camera_sensor_isi_dev_close(camera_module_lib_t *cal_lib)
+{
+	int32_t ret = RET_OK;
+
+	if (cal_lib == NULL)
+		return -RET_ERROR;
+	if (cal_lib->so_fd <= 0)
+		return RET_OK;
+
+	close(cal_lib->so_fd);
+	cal_lib->so_fd = -1;
+
+	return ret;
+}
+
+int32_t camera_sensor_isi_dev_data_put(camera_module_lib_t *cal_lib, camera_calib_t *pcalib)
+{
+	int32_t ret = RET_OK;
+
+	if (cal_lib == NULL || pcalib == NULL)
+		return -RET_ERROR;
+
+	if (cal_lib->so_fd <= 0) {
+		cam_err("camera cali get so_fd failed \n");
+		return -RET_ERROR;
+	}
+
+	ret = ioctl(cal_lib->so_fd, AC_CALIB_INIT, pcalib);
+	if (ret < 0) {
+		cam_err("%s ioctl fail, ret =%d, %s \n", __func__, ret, strerror(ret));
+		return -RET_ERROR;
+	}
+
+	return ret;
+}

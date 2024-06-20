@@ -10,6 +10,13 @@
 extern "C" {
 #endif
 
+enum MODE_TYPE {
+	SC1330T,
+	SC1330T_HDR,
+	MODE_TYPE_MAX,
+	MODE_TYPE_NUM,
+};
+
 static uint32_t sc1330t_linear_init_30fps_setting[] = {
 	0x0103,0x01,
 	0x0100,0x00,

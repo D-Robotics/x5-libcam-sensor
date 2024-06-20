@@ -21,6 +21,7 @@
 #include "inc/sc1330t_setting.h"
 #include "inc/sensor_effect_common.h"
 #include "hb_camera_data_config.h"
+#include "../serial/max_serial.h"
 
 #define MCLK (24000000)
 
@@ -32,6 +33,31 @@
 int sc1330t_dol2_data_init(sensor_info_t *sensor_info);
 
 static int power_ref;
+
+emode_data_t emode_data[MODE_TYPE_MAX] = {
+	[SC1330T] = {
+		.serial_addr = 0x00,		// serial i2c addr, dummy
+		.sensor_addr = 0x30,		// sensor i2c addr
+		.eeprom_addr = 0x00,		// eeprom i2c addr, dummy
+		.serial_rclk_out = 0,		// 0: reserved
+		.rclk_mfp = 0,                // 0: reserved
+	},
+	[SC1330T_HDR] = {
+		.serial_addr = 0x00,		// serial i2c addr, dummy
+		.sensor_addr = 0x30,		// sensor i2c addr
+		.eeprom_addr = 0x00,		// eeprom i2c addr, dummy
+		.serial_rclk_out = 0,		// 0: reserved
+		.rclk_mfp = 0,                // 0: reserved
+	},
+};
+
+static const sensor_emode_type_t sensor_emode[MODE_TYPE_NUM] = {
+	SENSOR_EMADD(SC1330T, "0.0.1", "sc1330t", "0.1.0.0", &emode_data[SC1330T]),
+	SENSOR_EMADD(SC1330T_HDR, "0.0.1", "sc1330t_hdr", "0.1.0.0", &emode_data[SC1330T_HDR]),
+
+	SENSOR_EMEND(),
+};
+
 int sc1330t_linear_data_init(sensor_info_t *sensor_info);
 
 int sensor_poweroff(sensor_info_t *sensor_info)
@@ -551,12 +577,13 @@ static int sensor_userspace_control(uint32_t port, uint32_t *enable)
 }
 
 #ifdef CAMERA_FRAMEWORK_HBN
-SENSOR_MODULE_F(sc1330t, CAM_MODULE_FLAG_A16D8);
+SENSOR_MODULE_EF(sc1330t, sensor_emode, CAM_MODULE_FLAG_A16D8);
 sensor_module_t sc1330t = {
         .module = SENSOR_MNAME(sc1330t),
 #else
 sensor_module_t sc1330t = {
         .module = "sc1330t",
+	.emode = sensor_emode,
 #endif
         .init = sensor_init,
         .start = sensor_start,

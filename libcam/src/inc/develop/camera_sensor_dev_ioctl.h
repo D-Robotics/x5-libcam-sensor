@@ -121,6 +121,11 @@ extern "C" {
  * @def SENSOR_IDEV_PATH
  * sensor iq(calib) dev path string
  */
+#ifdef HB_X5_CALI
+#define SENSOR_IDEV_PATH        "/dev/isi_sensor"
+#define AC_CALIB_IOC_MAGIC      's'	// ISI_SENSOR_IOC_MAGIC
+#define AC_CALIB_INIT           _IOW(AC_CALIB_IOC_MAGIC, 13, camera_calib_t)
+#else
 #ifdef CAM_CONFIG_SENSOR_IDEV_PATH
 #define SENSOR_IDEV_PATH	CAM_CONFIG_SENSOR_IDEV_PATH
 #else
@@ -129,10 +134,11 @@ extern "C" {
 
 #define AC_CALIB_IOC_MAGIC      'd'
 #define AC_CALIB_INIT           _IOW(AC_CALIB_IOC_MAGIC, 0, camera_calib_t)
+#endif
+
 #define AC_CALIB_RELEASE        _IOW(AC_CALIB_IOC_MAGIC, 1, camera_calib_t)
 #define AC_CALIB_TOTAL_SIZE     _IOWR(AC_CALIB_IOC_MAGIC, 4, uint32_t)
 #define AC_CALIB_GET_VERSION    _IOR(AC_CALIB_IOC_MAGIC, 5, sensor_version_info_t)
-
 /**
  * @def SENSOR_IQ_IOC_NAMES
  * sensor iq ioctl command name string array

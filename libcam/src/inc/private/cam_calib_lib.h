@@ -33,6 +33,10 @@ extern int32_t camera_calib_init(calib_info_t *cal_if);
 extern int32_t camera_calib_deinit(calib_info_t *cal_if);
 extern int32_t camera_calib_get_version(calib_info_t *cal_if, char *name, char *version);
 
+extern int32_t camera_calib_set_cali_name_init(camera_module_lib_t *cal_lib);
+extern int32_t camera_calib_set_cali_name_put(camera_module_lib_t *cal_lib, camera_calib_t *pcalib);
+extern int32_t camera_calib_set_cali_name_deinit(camera_module_lib_t *cal_lib);
+
 #ifdef __cplusplus
 }
 #endif

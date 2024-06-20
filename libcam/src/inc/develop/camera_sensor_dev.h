@@ -517,6 +517,8 @@ extern int32_t camera_sensor_idev_totalsize(calib_info_t *cal_if);
 extern int32_t camera_sensor_idev_init(calib_info_t *cal_if, camera_calib_t *pcalib);
 extern int32_t camera_sensor_idev_deinit(calib_info_t *cal_if, camera_calib_t *pcalib);
 extern int32_t camera_sensor_idev_get_version(calib_info_t *cal_if, sensor_version_info_t *ver);
+extern int32_t camera_sensor_isi_dev_open(camera_module_lib_t *cal_lib);
+extern int32_t camera_sensor_isi_dev_data_put(camera_module_lib_t *cal_lib, camera_calib_t *pcalib);
 
 #ifdef __cplusplus
 }

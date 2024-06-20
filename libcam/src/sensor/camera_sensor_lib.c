@@ -562,6 +562,49 @@ int32_t camera_sensor_ops_bind(camera_handle_st *hcam, sensor_info_t *sen_if, ca
 	return ret;
 }
 
+int32_t camera_sensor_set_cali_name(camera_handle_st *hcam, char *sensor_name, int32_t camera_index)
+{
+	int32_t ret = RET_OK;
+	const char *calib_lname = NULL;
+	camera_calib_t pcalib = {0};
+	camera_module_lib_t *cal_lib;
+
+	if (hcam == NULL)
+		return -RET_ERROR;
+
+	calib_lname = camera_sensor_config_calib_lname(hcam);
+	if (calib_lname == NULL) {
+		cam_err("calib_lname is null, we will try sensor name.\n");
+		if (sensor_name != NULL) {
+			strncpy(pcalib.name, sensor_name, sizeof(pcalib.name));
+		} else {
+			cam_err("calib_lname and sensor name all null, please check your code.\n");
+			return -RET_ERROR;
+		}
+	} else {
+		strncpy(pcalib.name, calib_lname, sizeof(pcalib.name));
+	}
+
+	pcalib.port = camera_index;
+
+	cal_lib = &hcam->calib_lib;
+
+	ret = camera_calib_set_cali_name_init(cal_lib);
+	if (ret < 0) {
+		cam_err("camera_calib_set_cali_name_init fail, ret=%d\n", ret);
+		return ret;
+	}
+	ret = camera_calib_set_cali_name_put(cal_lib, &pcalib);
+	if (ret < 0) {
+		cam_err("camera_calib_set_cali_name_put fail, ret=%d\n", ret);
+		return ret;
+	}
+
+	cam_info("%s port:%d, calib_lname:%s\n", __func__, camera_index, pcalib.name);
+
+	return ret;
+}
+
 /**
  * @NO{S10E02C04}
  * @ASIL{B}
@@ -1417,6 +1460,7 @@ int32_t camera_sensor_init(sensor_info_t *sen_if)
 			}
 		}
 
+#ifndef HB_X5_CALI
 		/* calib init if need */
 		if (cal_if != NULL) {
 			ret = camera_calib_init(cal_if);
@@ -1426,13 +1470,18 @@ int32_t camera_sensor_init(sensor_info_t *sen_if)
 				goto init_error_resulterr;
 			}
 		}
+#endif
 
 		/* do init */
 		ret = m->init(sen_if);
 		if (ret < 0) {
 			cam_err("sensor%d %s init error %d\n",
 				sindex, sname, ret);
+#ifndef HB_X5_CALI
 			goto init_error_calibdeinit;
+#else
+			goto init_error_resulterr;
+#endif
 		}
 
 		/* ctrl init */
@@ -1483,9 +1532,11 @@ init_error_ctrldeinit:
 init_error_deinit:
 	if (m->deinit != NULL)
 		m->deinit(sen_if);
+#ifndef HB_X5_CALI
 init_error_calibdeinit:
 	if (cal_if != NULL)
 		camera_calib_deinit(cal_if);
+#endif
 init_error_resulterr:
 	camera_sensor_dev_init_result(sen_if, ret);
 init_error_i2cdeinit:
@@ -1547,8 +1598,10 @@ int32_t camera_sensor_deinit(sensor_info_t *sen_if)
 		if (m->deinit != NULL)
 			m->deinit(sen_if);
 
+#ifndef HB_X5_CALI
 		if (cal_if != NULL)
 			camera_calib_deinit(cal_if);
+#endif
 	}
 
 	/* i2c deinit */
