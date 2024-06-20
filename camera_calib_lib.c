@@ -549,13 +549,14 @@ static int32_t camera_calib_data_deinit(calib_info_t *cal_if)
 	sname = cal_if->sensor_name;
 
 	pcalib.port = cal_if->port;
+#ifndef HB_X5_CALI
 	ret = camera_sensor_idev_deinit(cal_if, &pcalib);
 	if (ret < 0) {
 		cam_err("sensor%d %s calib idev deinit error %d\n",
 			sindex, sname, ret);
 		return ret;
 	}
-
+#endif
 	cam_info("sensor%d %s calib idev deinit done\n", sindex, sname);
 	return ret;
 }
@@ -712,4 +713,52 @@ int32_t camera_calib_get_version(calib_info_t *cal_if, char *name, char *version
 	}
 
 	return 0;
+}
+
+int32_t camera_calib_set_cali_name_init(camera_module_lib_t *cal_lib)
+{
+       int32_t ret = RET_OK;
+
+       if (cal_lib == NULL)
+               return -RET_ERROR;
+
+       ret = camera_sensor_isi_dev_open(cal_lib);
+       if (ret < 0) {
+               cam_err("sensor open isi dev fail, ret = %d\n", ret);
+               return ret;
+       }
+
+       return ret;
+}
+
+int32_t camera_calib_set_cali_name_deinit(camera_module_lib_t *cal_lib)
+{
+	int32_t ret = RET_OK;
+
+	if (cal_lib == NULL)
+		return -RET_ERROR;
+
+	ret = camera_sensor_isi_dev_close(cal_lib);
+	if (ret < 0) {
+		cam_err("sensor close isi dev fail, ret = %d\n", ret);
+		return ret;
+	}
+
+	return ret;
+}
+
+int32_t camera_calib_set_cali_name_put(camera_module_lib_t *cal_lib, camera_calib_t *pcalib)
+{
+       int32_t ret = RET_OK;
+
+       if (cal_lib == NULL || pcalib == NULL)
+               return -RET_ERROR;
+
+       ret = camera_sensor_isi_dev_data_put(cal_lib, pcalib);
+       if (ret < 0) {
+               cam_err("sensor put isi dev data fail, ret = %d\n", ret);
+               return ret;
+       }
+
+       return ret;
 }
