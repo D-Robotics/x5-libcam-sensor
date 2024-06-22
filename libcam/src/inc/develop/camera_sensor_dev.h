@@ -145,7 +145,8 @@ typedef struct sensor_data {
 	uint32_t  data_width;       // Bits per pixel.
 	uint32_t  bayer_start;      // RGGB pattern start (R/Gr/Gb/B).
 	uint32_t  bayer_pattern;    // CFA pattern type (RGGB/RCCC/RIrGB/RGIrB).
-	uint32_t  exposure_max_bit_width; // pwl mode bits
+	uint32_t  exposure_max_bit_width; // pwl mode Bits
+	uint32_t  exposure_time_step;
 #endif
 }sensor_data_t;
 

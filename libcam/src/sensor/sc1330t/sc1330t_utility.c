@@ -377,44 +377,21 @@ int sc1330t_dol2_data_init(sensor_info_t *sensor_info)
 	// turning sensor_data
 	turning_data.sensor_data.turning_type = 6;
 	turning_data.sensor_data.lines_per_second = 75000;	//vts*fps=2500*30=75000
-	turning_data.sensor_data.exposure_time_max = 968;
+	turning_data.sensor_data.exposure_time_max = 544;	//short frame:
+	turning_data.sensor_data.exposure_time_long_max = 1500;	//long frame: 20ms
 
 	turning_data.sensor_data.active_width = 1280;
 	turning_data.sensor_data.active_height = 960;
-	turning_data.sensor_data.analog_gain_max = 205;
-	turning_data.sensor_data.digital_gain_max = 159;
-	turning_data.sensor_data.exposure_time_min = 1;
-	turning_data.sensor_data.exposure_time_long_max = 2176;
-	// turning_data.sensor_data.conversion = 1;
 
-	// turning normal
-	// // // short frame
-	// turning_data.dol2.s_line = SC1330T_DOL2_SHORT_EXP_LINE;
-	// turning_data.dol2.s_line_length = 2;
-	// // long frame
-	// turning_data.dol2.m_line = S1330T_EXP_LINE;
-	// turning_data.dol2.m_line_length = 2;
+	turning_data.sensor_data.analog_gain_max = 205;		//gain lut index
+	turning_data.sensor_data.digital_gain_max = 255;	//gain lut index
+	turning_data.sensor_data.exposure_time_min = 1;
+
+	turning_data.sensor_data.exposure_time_step = 2;	//hdr exposure_time_step, from spec
 
         // raw10
         sensor_data_bayer_fill(&turning_data.sensor_data, 10, (uint32_t)BAYER_START_B, (uint32_t)BAYER_PATTERN_RGGB);
         sensor_data_bits_fill(&turning_data.sensor_data, 12);
-
-
-	turning_data.dol2.line_p[0].ratio = 1 << 8;
-	turning_data.dol2.line_p[0].offset = 0;
-	turning_data.dol2.line_p[0].max = 66;
-	turning_data.dol2.line_p[1].ratio = 1 << 8;
-	turning_data.dol2.line_p[1].offset = 0;
-	turning_data.dol2.line_p[1].max = 2176;
-
-#if 0
-	turning_data.dol2.again_control_num = 1;
-	turning_data.dol2.again_control[0] = S1330T_PROGRAM_GAIN;
-	turning_data.dol2.again_control_length[0] = 2;
-	turning_data.dol2.dgain_control_num = 1;
-	turning_data.dol2.dgain_control_length[0] = 2;
-	turning_data.dol2.dgain_control[0] = S1330T_DIGITAL_GAIN;
-#endif
 
 	turning_data.stream_ctrl.data_length = 1;
 	if(sizeof(turning_data.stream_ctrl.stream_on) >= sizeof(sc1330t_stream_on_setting)) {
@@ -423,7 +400,7 @@ int sc1330t_dol2_data_init(sensor_info_t *sensor_info)
 		vin_err("Number of registers on stream over 10\n");
 		return -RET_ERROR;
 	}
-	if(sizeof(turning_data.stream_ctrl.stream_on) >= sizeof(sc1330t_stream_off_setting)) {
+	if(sizeof(turning_data.stream_ctrl.stream_off) >= sizeof(sc1330t_stream_off_setting)) {
 		memcpy(stream_off, sc1330t_stream_off_setting, sizeof(sc1330t_stream_off_setting));
 	} else {
 		vin_err("Number of registers on stream over 10\n");
@@ -472,14 +449,22 @@ int sc1330t_dol2_data_init(sensor_info_t *sensor_info)
 static int sensor_aexp_gain_control(hal_control_info_t *info, uint32_t mode, uint32_t *again, uint32_t *dgain, uint32_t gain_num)
 {
     //vin_info("%s %s mode:%d gain_num:%d again[0]:%x, dgain[0]:%x\n", __FILE__, __FUNCTION__, mode, gain_num, again[0], dgain[0]);
-	const uint16_t AGAIN_LOW = 0x3e08;
+	const uint16_t AGAIN_LOW = 0x3e08;	//for linear or dol2 long frame
 	const uint16_t AGAIN_HIGH = 0x3e09;
 	const uint16_t DGAIN_LOW = 0x3e06;
 	const uint16_t DGAIN_HIGH = 0x3e07;
+	const uint16_t S_AGAIN_LOW = 0x3e12;	//for dol2 short frame
+	const uint16_t S_AGAIN_HIGH = 0x3e13;
+	const uint16_t S_DGAIN_LOW = 0x3e10;
+	const uint16_t S_DGAIN_HIGH = 0x3e11;
 	char lower_again_reg_value = 0, high_again_reg_value = 0;
 	char lower_dgain_reg_value = 0, high_dgain_reg_value = 0;
+	char s_lower_again_reg_value = 0, s_high_again_reg_value = 0;
+	char s_lower_dgain_reg_value = 0, s_high_dgain_reg_value = 0;
+
 	int again_index = 0, dgain_index = 0;
-	if (mode == NORMAL_M || mode == DOL2_M) {
+	int s_again_index = 0, s_dgain_index = 0;
+	if (mode == NORMAL_M) {
 		if (again[0] >= sizeof(sc1330t_gain_lut)/sizeof(uint32_t))
 			again_index = sizeof(sc1330t_gain_lut)/sizeof(uint32_t) - 1;
 		else
@@ -502,14 +487,51 @@ static int sensor_aexp_gain_control(hal_control_info_t *info, uint32_t mode, uin
 		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, AGAIN_HIGH, high_again_reg_value);
 		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, DGAIN_LOW, lower_dgain_reg_value);
 		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, DGAIN_HIGH, high_dgain_reg_value);
-		if (mode == DOL2_M) {
-			vin_i2c_write8(info->bus_num, 16, info->sensor_addr, 0x3e12, lower_again_reg_value);
-			vin_i2c_write8(info->bus_num, 16, info->sensor_addr, 0x3e13, high_again_reg_value);
-			vin_i2c_write8(info->bus_num, 16, info->sensor_addr, 0x3e10, lower_dgain_reg_value);
-			vin_i2c_write8(info->bus_num, 16, info->sensor_addr, 0x3e11, high_dgain_reg_value);
-		}
+	} else if (mode == DOL2_M){
+		if (again[0] >= sizeof(sc1330t_gain_lut)/sizeof(uint32_t))
+			again_index = sizeof(sc1330t_gain_lut)/sizeof(uint32_t) - 1;
+		else
+			again_index = again[0];
 
-	} else	{
+		if (again[1] >= sizeof(sc1330t_gain_lut)/sizeof(uint32_t))
+			s_again_index = sizeof(sc1330t_gain_lut)/sizeof(uint32_t) - 1;
+		else
+			s_again_index = again[1];
+
+		if (dgain[0] >= sizeof(sc1330t_dgain_lut)/sizeof(uint32_t))
+			dgain_index = sizeof(sc1330t_dgain_lut)/sizeof(uint32_t) - 1;
+		else
+			dgain_index = dgain[0];
+
+		if (dgain[1] >= sizeof(sc1330t_dgain_lut)/sizeof(uint32_t))
+			s_dgain_index = sizeof(sc1330t_dgain_lut)/sizeof(uint32_t) - 1;
+		else
+			s_dgain_index = dgain[1];
+
+
+		lower_again_reg_value = sc1330t_gain_lut[again_index] & 0x000000FF;
+		high_again_reg_value = (sc1330t_gain_lut[again_index] >> 8) & 0x000000FF;
+		lower_dgain_reg_value = sc1330t_dgain_lut[dgain_index] & 0x000000FF;
+		high_dgain_reg_value = (sc1330t_dgain_lut[dgain_index] >> 8) & 0x000000FF;
+
+		s_lower_again_reg_value = sc1330t_gain_lut[s_again_index] & 0x000000FF;
+		s_high_again_reg_value = (sc1330t_gain_lut[s_again_index] >> 8) & 0x000000FF;
+		s_lower_dgain_reg_value = sc1330t_dgain_lut[s_dgain_index] & 0x000000FF;
+		s_high_dgain_reg_value = (sc1330t_dgain_lut[s_dgain_index] >> 8) & 0x000000FF;
+
+		//vin_info("%s again_index = %d, dgain_index = %d, s_again_index = %d, s_dgain_index = %d \n",
+		//	__FUNCTION__, again_index, dgain_index, s_again_index, s_dgain_index);
+
+		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, AGAIN_LOW, lower_again_reg_value);
+		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, AGAIN_HIGH, high_again_reg_value);
+		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, DGAIN_LOW, lower_dgain_reg_value);
+		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, DGAIN_HIGH, high_dgain_reg_value);
+		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, S_AGAIN_LOW, s_lower_again_reg_value);
+		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, S_AGAIN_HIGH, s_high_again_reg_value);
+		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, S_DGAIN_LOW, s_lower_dgain_reg_value);
+		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, S_DGAIN_LOW, s_high_dgain_reg_value);
+
+	} else {
 		vin_err(" unsupport mode %d\n", mode);
 	}
 
@@ -518,7 +540,7 @@ static int sensor_aexp_gain_control(hal_control_info_t *info, uint32_t mode, uin
 
 static int sensor_aexp_line_control(hal_control_info_t *info, uint32_t mode, uint32_t *line, uint32_t line_num)
 {
-    //vin_info(" line mode %d, --line %d , line_num:%d \n", mode, line[0], line_num);
+	//vin_info(" line mode %d, --line %d , line_num:%d \n", mode, line[0], line_num);
 	const uint16_t EXP_LINE0 = 0x3e00;
 	const uint16_t EXP_LINE1 = 0x3e01;
 	const uint16_t EXP_LINE2 = 0x3e02;
@@ -540,10 +562,10 @@ static int sensor_aexp_line_control(hal_control_info_t *info, uint32_t mode, uin
                 temp2 = (sline & 0x0F) << 4;
                 vin_i2c_write8(info->bus_num, 16, info->sensor_addr, EXP_LINE2, temp2);
 	} else if (mode == DOL2_M) {
-		//vin_err(" line mode %d, line0 %u , line1: %u, line_num:%d \n", mode, line[0], line[1], line_num);
-		uint32_t lline = line[1];
-		if ( lline > 1870) {
-			lline = 1870;
+		//printf(" line mode %d, line0 %u , line1: %u, line_num:%d \n", mode, line[0], line[1], line_num);
+		uint32_t lline = line[0];	//long frame  20ms
+		if ( lline > 1500) {
+			lline = 1500;
 		}
 		temp0 = (lline & 0xF000) >> 12;
 		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, EXP_LINE0, temp0);
@@ -552,9 +574,9 @@ static int sensor_aexp_line_control(hal_control_info_t *info, uint32_t mode, uin
 		temp2 = (lline & 0x0F) << 4;
 		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, EXP_LINE2, temp2);
 
-		uint32_t sline = line[0];
-		if ( sline > 116) {
-			sline = 116;
+		uint32_t sline = line[1];	//short frame
+		if ( sline > 544) {
+			sline = 544;
 		}
 		temp0 = (sline & 0xFF0) >> 4;
 		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, S_EXP_LINE0, temp0);
