@@ -100,6 +100,9 @@ int sensor_init(sensor_info_t *sensor_info)
         // set resolution and format
         if (sensor_info->resolution == 1080) {
                 pr_debug("ov2778 resolution is 1080 \n");
+                hb_vin_i2c_write_reg16_data8(sensor_info->bus_num, sensor_info->sensor_addr, OV2778_SFW_CTRL1, 0x0);
+                hb_vin_i2c_write_reg16_data8(sensor_info->bus_num, sensor_info->sensor_addr, 0x3013, 0x01);
+                usleep(1000);
                 setting_size =
                         sizeof(ov2778_init_settings) / sizeof(uint32_t) / 2;
                 ret = vin_write_array(sensor_info->bus_num,
@@ -121,7 +124,7 @@ int sensor_init(sensor_info_t *sensor_info)
                 pr_err("unsupported format\n");
                 return -RET_ERROR;
         }
-        hb_vin_i2c_write_reg16_data8(sensor_info->bus_num, sensor_info->sensor_addr, OV2778_ISP_PRE_CTL, 0x80);
+        // hb_vin_i2c_write_reg16_data8(sensor_info->bus_num, sensor_info->sensor_addr, OV2778_ISP_PRE_CTL, 0x80);
 
         ret = ov2778_linear_data_init(sensor_info);
         if (ret < 0) {
@@ -238,7 +241,7 @@ static int ov2778_linear_data_init(sensor_info_t *sensor_info)
         ov2778_common_data_init(sensor_info, &turning_data);
         ov2778_normal_data_init(sensor_info, &turning_data);
 
-        sensor_data_bayer_fill(&turning_data.sensor_data, 10, (uint32_t)BAYER_START_R, (uint32_t)BAYER_PATTERN_RGGB);
+        sensor_data_bayer_fill(&turning_data.sensor_data, 12, (uint32_t)BAYER_RGBIR_4x4_START_BGGIR, (uint32_t)BAYER_PATTERN_GRBIR_4X4);
         sensor_data_bits_fill(&turning_data.sensor_data, 12);
 
         turning_data.sensor_data.gain_max = 128 * 8192;            // TBC

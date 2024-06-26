@@ -75,18 +75,39 @@ typedef enum enum_bayer_start_e
 } bayer_start_e;
 
 /**
+ * @struct enum_bayer_rgbir_4x4_start_e
+ * sensor bayer pattern start type
+ */
+typedef enum enum_bayer_rgbir_4x4_statr_e {
+	BAYER_RGBIR_4x4_START_GRIRG = 0,//BAYER_RGGB_START_GBRG
+	BAYER_RGBIR_4x4_START_RGGIR = 1,//BAYER_RGGB_START_BGGR
+	BAYER_RGBIR_4x4_START_GBIRG = 2,//BAYER_RGGB_START_GBRG
+	BAYER_RGBIR_4x4_START_BGGIR = 3,//BAYER_RGGB_START_BGGR
+	BAYER_RGBIR_4x4_START_IRGGB = 4,//BAYER_RGGB_START_RGGB
+	BAYER_RGBIR_4x4_START_GIRBG = 5,//BAYER_RGGB_START_GRBG
+	BAYER_RGBIR_4x4_START_IRGGR = 6,//BAYER_RGGB_START_RGGB
+	BAYER_RGBIR_4x4_START_GIRRG = 7,//BAYER_RGGB_START_GRBG
+
+	BAYER_RGBIR_4x4_START_BUTT
+} bayer_rgbir_4x4_start_e;
+
+/**
  * @enum enum_bayer_pattern_e
  * sensor device param of bayer pattern enum
  * @NO{S10E02C05}
  */
 typedef enum enum_bayer_pattern_e
 {
-	BAYER_PATTERN_RGGB    = 0,
-	BAYER_PATTERN_RCCC    = 1,
-	BAYER_PATTERN_RIRGB   = 2,
-	BAYER_PATTERN_RGIRB   = 3,
-	BAYER_PATTERN_RCCB    = 4,
-	BAYER_PATTERN_RYYCY   = 5,
+	BAYER_PATTERN_RGGB      = 0,
+	BAYER_PATTERN_RCCC      = 1,
+	BAYER_PATTERN_RCCB      = 2,
+	BAYER_PATTERN_RCCG      = 3,
+	BAYER_PATTERN_CCCC      = 4,
+	BAYER_PATTERN_RGBIR_2X2 = 5,
+	BAYER_PATTERN_GRBIR_4X4 = 6,
+	BAYER_PATTERN_RYYCy     = 7,
+	BAYER_PATTERN_RYYB      = 8,
+	BAYER_PATTERN_RGBW      = 9,
 
 	BAYER_PATTERN_BUTT
 } bayer_pattern_e;
