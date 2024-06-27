@@ -567,14 +567,14 @@ int32_t camera_sensor_set_cali_name(camera_handle_st *hcam, char *sensor_name, i
 	int32_t ret = RET_OK;
 	const char *calib_lname = NULL;
 	camera_calib_t pcalib = {0};
-	camera_module_lib_t *cal_lib;
+	camera_module_lib_t *cal_lib = NULL;
 
 	if (hcam == NULL)
 		return -RET_ERROR;
 
 	calib_lname = camera_sensor_config_calib_lname(hcam);
 	if (calib_lname == NULL) {
-		cam_err("calib_lname is null, we will try sensor name.\n");
+		cam_warn("calib_lname is null, we will try sensor name.\n");
 		if (sensor_name != NULL) {
 			strncpy(pcalib.name, sensor_name, sizeof(pcalib.name));
 		} else {
