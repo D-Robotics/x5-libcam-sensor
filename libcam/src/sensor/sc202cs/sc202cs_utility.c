@@ -62,8 +62,8 @@ int sc202cs_linear_data_init_1600x1200(sensor_info_t *sensor_info)
 	turning_data.sensor_data.active_width = 1600;
 	turning_data.sensor_data.active_height = 1200;
 
-	turning_data.sensor_data.analog_gain_max = 28;
-	turning_data.sensor_data.digital_gain_max = 32;
+	turning_data.sensor_data.analog_gain_max = 190;
+	turning_data.sensor_data.digital_gain_max = 0;
 	turning_data.sensor_data.exposure_time_min = 8;
 	// No setting is required in linear mode
 	turning_data.sensor_data.exposure_time_long_max = 4000;
