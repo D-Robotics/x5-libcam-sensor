@@ -55,16 +55,17 @@ int sc202cs_linear_data_init_1600x1200(sensor_info_t *sensor_info)
 	// turning sensor_data
 	// lines_per_second = fps * vts, vts = {16‘h320e,16’h320f} = 1400
 	// If trigger is enabled, the configuration before trigger will still be used.
-	turning_data.sensor_data.lines_per_second = 53760;
+	turning_data.sensor_data.lines_per_second = 37500;
 	// form customer, exposure time max = 10ms
-	turning_data.sensor_data.exposure_time_max = 1792;
+	turning_data.sensor_data.exposure_time_max = 1125;
 
 	turning_data.sensor_data.active_width = 1600;
 	turning_data.sensor_data.active_height = 1200;
 
 	turning_data.sensor_data.analog_gain_max = 190;
 	turning_data.sensor_data.digital_gain_max = 0;
-	turning_data.sensor_data.exposure_time_min = 8;
+	turning_data.sensor_data.exposure_time_min = 1;
+
 	// No setting is required in linear mode
 	turning_data.sensor_data.exposure_time_long_max = 4000;
 
