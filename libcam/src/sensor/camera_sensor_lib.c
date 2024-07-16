@@ -574,9 +574,9 @@ int32_t camera_sensor_set_cali_name(camera_handle_st *hcam, char *sensor_name, i
 
 	calib_lname = camera_sensor_config_calib_lname(hcam);
 	if (calib_lname == NULL) {
-		cam_warn("calib_lname is null, we will try sensor name.\n");
+		cam_warn("calib_lname is null, we will try sensor_name_tuning.json.\n");
 		if (sensor_name != NULL) {
-			strncpy(pcalib.name, sensor_name, sizeof(pcalib.name));
+			snprintf(pcalib.name, sizeof(pcalib.name), "%s_tuning.json", sensor_name);
 		} else {
 			cam_err("calib_lname and sensor name all null, please check your code.\n");
 			return -RET_ERROR;
