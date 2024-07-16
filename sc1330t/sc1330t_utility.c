@@ -52,8 +52,8 @@ emode_data_t emode_data[MODE_TYPE_MAX] = {
 };
 
 static const sensor_emode_type_t sensor_emode[MODE_TYPE_NUM] = {
-	SENSOR_EMADD(SC1330T, "0.0.1", "sc1330t", "0.1.0.0", &emode_data[SC1330T]),
-	SENSOR_EMADD(SC1330T_HDR, "0.0.1", "sc1330t_hdr", "0.1.0.0", &emode_data[SC1330T_HDR]),
+	SENSOR_EMADD(SC1330T, "0.0.1", "sc1330t_tuning.json", "0.1.0.0", &emode_data[SC1330T]),
+	SENSOR_EMADD(SC1330T_HDR, "0.0.1", "sc1330t_hdr_tuning.json", "0.1.0.0", &emode_data[SC1330T_HDR]),
 
 	SENSOR_EMEND(),
 };
