@@ -481,6 +481,10 @@ extern camera_handle_t hbn_camera_get_handle(vpf_handle_t vin_fd, int32_t camera
  */
 extern int32_t hbn_camera_init_cfg(const char *cfg_file);
 
+
+
+extern int32_t hbn_camera_switch_scence(int64_t vflow_fd, int64_t isp_vnode_fd, const char *cname);
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */

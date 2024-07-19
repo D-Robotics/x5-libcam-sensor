@@ -73,7 +73,7 @@ extern int32_t camera_sensor_stream_off(sensor_info_t *sen_if);
 extern int32_t camera_sensor_get_csi_attr(sensor_info_t *sen_if, csi_attr_t *csi_attr);
 extern int32_t camera_sensor_get_version(sensor_info_t *sen_if, char *name, char *version);
 extern int32_t camera_sensor_dump(sensor_info_t *sen_if);
-extern int32_t camera_sensor_set_cali_name(camera_handle_st *hcam, char *sensor_name, int32_t camera_index);
+extern int32_t camera_sensor_set_cali_name(camera_handle_st *hcam, char *sensor_name, int32_t camera_index, char *new_calib_lname);
 
 #ifdef __cplusplus
 }

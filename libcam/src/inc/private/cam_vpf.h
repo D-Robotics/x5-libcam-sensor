@@ -52,6 +52,11 @@ extern int32_t camera_vpf_vin_detach_deserial(vpf_handle_t vin_fd, int32_t deser
 extern int32_t camera_vpf_vin_attach_txser(vpf_handle_t vin_fd, int32_t txser_index, mipi_config_t *mipi_config);
 extern int32_t camera_vpf_vin_detach_txser(vpf_handle_t vin_fd, int32_t txser_index, mipi_config_t *mipi_config);
 
+extern int32_t camera_vpf_vflow_stop(hbn_vflow_handle_t vflow_fd);
+extern int32_t camera_vpf_vflow_start(hbn_vflow_handle_t vflow_fd);
+extern int32_t camera_vpf_update_cali_name(hbn_vnode_handle_t isp_vnode_fd);
+extern hbn_vnode_handle_t camera_vpf_vflow_to_vin_fd(hbn_vflow_handle_t vflow_fd);
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */
