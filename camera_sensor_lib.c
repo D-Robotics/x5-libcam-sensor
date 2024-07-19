@@ -562,7 +562,8 @@ int32_t camera_sensor_ops_bind(camera_handle_st *hcam, sensor_info_t *sen_if, ca
 	return ret;
 }
 
-int32_t camera_sensor_set_cali_name(camera_handle_st *hcam, char *sensor_name, int32_t camera_index)
+int32_t camera_sensor_set_cali_name(camera_handle_st *hcam, char *sensor_name, int32_t camera_index,
+					char *new_calib_lname)
 {
 	int32_t ret = RET_OK;
 	const char *calib_lname = NULL;
@@ -572,17 +573,27 @@ int32_t camera_sensor_set_cali_name(camera_handle_st *hcam, char *sensor_name, i
 	if (hcam == NULL)
 		return -RET_ERROR;
 
-	calib_lname = camera_sensor_config_calib_lname(hcam);
-	if (calib_lname == NULL) {
-		cam_warn("calib_lname is null, we will try sensor_name_tuning.json.\n");
-		if (sensor_name != NULL) {
-			snprintf(pcalib.name, sizeof(pcalib.name), "%s_tuning.json", sensor_name);
+	if ((camera_index < 0) || (camera_index >= CAM_CONFIG_CAMERA_MAX)) {
+		cam_err("camera get as %d over %d error\n",
+			camera_index, CAM_CONFIG_CAMERA_MAX);
+		return -RET_ERROR;
+	}
+
+	if (new_calib_lname == NULL) {
+		calib_lname = camera_sensor_config_calib_lname(hcam);
+		if (calib_lname == NULL) {
+			cam_warn("calib_lname is null, we will try sensor_name_tuning.json.\n");
+			if (sensor_name != NULL) {
+				snprintf(pcalib.name, sizeof(pcalib.name), "%s_tuning.json", sensor_name);
+			} else {
+				cam_err("calib_lname and sensor name all null, please check your code.\n");
+				return -RET_ERROR;
+			}
 		} else {
-			cam_err("calib_lname and sensor name all null, please check your code.\n");
-			return -RET_ERROR;
+			strncpy(pcalib.name, calib_lname, sizeof(pcalib.name));
 		}
 	} else {
-		strncpy(pcalib.name, calib_lname, sizeof(pcalib.name));
+		strncpy(pcalib.name, new_calib_lname, sizeof(pcalib.name));
 	}
 
 	pcalib.port = camera_index;
