@@ -97,6 +97,10 @@ endif
 SO_SRCS = $(wildcard ./*.c)
 SO_OBJS = $(patsubst ./%,${BUILD_OUTPUT_PATH}/%,$(SO_SRCS:.c=.o))
 
+INCDIR = inc
+DEPS = $(SO_OBJS:.o=.d)
+-include $(DEPS)
+
 # builid params
 INCS := -I../../inc/legacy/inc -I../../inc/legacy/utility -I../../inc/legacy/utility/sensor $(INCS)
 INCS := -I. -I../../inc  -I../../inc/private -I../../inc/develop -I../../inc/legacy $(INCS)
@@ -184,7 +188,7 @@ CFLAGS_THIS += -DSO_VERSION_MAJOR=$(SO_VERSION_MAJOR) -DSO_VERSION_MINOR=$(SO_VE
 ${BUILD_OUTPUT_PATH}/%.o: ./%.c
 	$(Q)mkdir -p $(abspath $(dir $@))
 	$(Q)echo CC $@
-	$(Q)$(CC) $(CFLAGS) $(CFLAGS_THIS) $(INCS) -c $< -o $@
+	$(Q)$(CC) $(CFLAGS) $(CFLAGS_THIS) $(INCS) -I$(INCDIR) -MMD -c $< -o $@
 
 $(SO_NAMEV): $(SO_NAMEVER)
 	$(Q)echo LN $@
