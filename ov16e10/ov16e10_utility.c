@@ -164,7 +164,7 @@ int sensor_init(sensor_info_t *sensor_info)
         }
 
         hb_vin_i2c_write_reg16_data8(sensor_info->bus_num, sensor_info->sensor_addr,
-                                     OV16E10_TPG_CTRL, 0x81);
+                                     OV16E10_TPG_CTRL, 0x00);
 
         ret = ov16e10_linear_data_init(sensor_info);
         if (ret < 0) {
@@ -281,7 +281,7 @@ static int ov16e10_linear_data_init(sensor_info_t *sensor_info)
         ov16e10_common_data_init(sensor_info, &turning_data);
         ov16e10_normal_data_init(sensor_info, &turning_data);
 
-        sensor_data_bayer_fill(&turning_data.sensor_data, 10, (uint32_t)BAYER_START_R, (uint32_t)BAYER_PATTERN_RGGB);
+        sensor_data_bayer_fill(&turning_data.sensor_data, 10, (uint32_t)BAYER_START_B, (uint32_t)BAYER_PATTERN_RGGB);
         sensor_data_bits_fill(&turning_data.sensor_data, 12);
 
         turning_data.sensor_data.gain_max = 128 * 8192;            // TBC
