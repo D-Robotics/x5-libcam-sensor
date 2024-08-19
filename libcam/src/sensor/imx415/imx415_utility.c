@@ -198,6 +198,78 @@ static int sensor_deinit(sensor_info_t *sensor_info)
 	return ret;
 }
 
+
+static int sensor_aexp_gain_control(hal_control_info_t *info, uint32_t mode, uint32_t *again, uint32_t *dgain, uint32_t gain_num)
+{
+#ifdef AE_DBG
+        printf("test %s, mode = %d gain_num = %d again[0] = %d, dgain[0] = %d\n", __FUNCTION__, mode, gain_num, again[0], dgain[0]);
+#endif
+    const uint16_t AGAIN = 0x3090;
+	char again_reg_value = 0;
+	int gain_index = 0;
+
+        if (mode == NORMAL_M) {
+	        if (again[0] >= sizeof(imx415_gain_lut)/sizeof(uint32_t))
+			gain_index = sizeof(imx415_gain_lut)/sizeof(uint32_t) - 1;
+		else
+			gain_index = again[0];
+
+		again_reg_value = (imx415_gain_lut[gain_index] >> 0) & 0xFF;
+#ifdef AE_DBG
+                printf("%s, gain_index: %d, again:0x3090 = 0x%x\n",
+				__FUNCTION__, gain_index, again_reg_value);
+#endif
+		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, AGAIN, again_reg_value);
+	} else	{
+		vin_err(" unsupport mode %d\n", mode);
+	}
+
+    return 0;
+}
+
+/* input value:
+ * line: exposure time value
+ * line_num: linear mode: 1; dol2 mode: 2
+ * */
+
+static int sensor_aexp_line_control(hal_control_info_t *info, uint32_t mode, uint32_t *line, uint32_t line_num)
+{
+#ifdef AE_DBG
+        printf("line mode %d, --line %d , line_num:%d \n", mode, line[0], line_num);
+#endif
+    const uint16_t EXP_LINE0 = 0x3050;
+	const uint16_t EXP_LINE1 = 0x3051;
+	const uint16_t EXP_LINE2 = 0x3052;
+	char temp0 = 0, temp1 = 0, temp2 = 0;
+
+        if (mode == NORMAL_M) {
+		uint32_t tmp =  line[0];
+		uint32_t sline = 2250 - (uint32_t)(tmp/1.2);
+		if ( sline > 2430) {
+			sline = 2430;
+		}
+		if (sline < 8) {
+			sline = 8;
+		}
+
+		temp0 = (sline >> 16) & 0x0F;
+		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, EXP_LINE2, temp0);
+		temp1 = (sline >> 8) & 0xFF;
+        vin_i2c_write8(info->bus_num, 16, info->sensor_addr, EXP_LINE1, temp1);
+		temp2 = (sline & 0xFF);
+        vin_i2c_write8(info->bus_num, 16, info->sensor_addr, EXP_LINE0, temp2);
+
+#ifdef AE_DBG
+        printf("write sline = %d, 0x3052 = 0x%x, 0x3051 = 0x%x,0x3050 = 0x%x\n",
+                        sline, temp0, temp1,temp2);
+#endif
+        } else {
+		vin_err(" unsupport mode %d\n", mode);
+	}
+
+	return 0;
+}
+
 static int imx415_linear_data_init(sensor_info_t *sensor_info)
 {
 	int ret = RET_OK;
@@ -221,31 +293,15 @@ static int imx415_linear_data_init(sensor_info_t *sensor_info)
 	turning_data.sensor_data.active_width = 3840;
 	turning_data.sensor_data.active_height = 2160;
 
-	turning_data.sensor_data.lines_per_second = 67114;
-	turning_data.sensor_data.exposure_time_max = 2242;
-	turning_data.sensor_data.exposure_time_min = 1;
+	turning_data.sensor_data.lines_per_second = 81000;
+	turning_data.sensor_data.exposure_time_max = 2430;
+	turning_data.sensor_data.exposure_time_min = 8;
 	turning_data.sensor_data.analog_gain_max = 255;
 	turning_data.sensor_data.digital_gain_max = 0;
 
-	//this sensor will set line and gain in kernel driver.
-	//we need set those value
-	turning_data.normal.param_hold = IMX415_PARAM_HOLD;	//for imx415
-	turning_data.normal.param_hold_length = 1;
-	turning_data.normal.s_line = IMX415_LINE;	//0x3050
-	turning_data.normal.s_line_length = 3;		//0x3050 [0:7] 0x3051 [0:7] 0x3052 [0:3]
-
-	// if (ratio < 0) ratio = -ratio
-	// line = (uint32_t)((offset > ((ratio * input_line) >> 8)) ? (offset - ((ratio * input_line) >> 8)) : 0)
-	turning_data.normal.line_p.ratio = -256;
-	turning_data.normal.line_p.offset = 2246;
-	turning_data.normal.line_p.max = 2237;
-
-	turning_data.normal.again_control_num = 1;
-	turning_data.normal.again_control[0] = IMX415_GAIN;
-	turning_data.normal.again_control_length[0] = 1;
 
 	//sensor bit && bayer
-	sensor_data_bayer_fill(&turning_data.sensor_data, 10, (uint32_t)BAYER_START_B, (uint32_t)BAYER_PATTERN_RGGB);
+	sensor_data_bayer_fill(&turning_data.sensor_data, 10, (uint32_t)BAYER_START_GB, (uint32_t)BAYER_PATTERN_RGGB);
 	// sensor exposure_max_bit, maybe not used ?  //FIXME
 	sensor_data_bits_fill(&turning_data.sensor_data, 12);
 
@@ -311,31 +367,15 @@ static int imx415_dol2_data_init(sensor_info_t *sensor_info)
 	turning_data.sensor_data.active_width = 3840;
 	turning_data.sensor_data.active_height = 2160;
 
-	turning_data.sensor_data.lines_per_second = 67114;
-	turning_data.sensor_data.exposure_time_max = 2242;
-	turning_data.sensor_data.exposure_time_min = 1;
+	turning_data.sensor_data.lines_per_second = 81000;
+	turning_data.sensor_data.exposure_time_max = 2430;
+	turning_data.sensor_data.exposure_time_min = 8;
 	turning_data.sensor_data.analog_gain_max = 255;
 	turning_data.sensor_data.digital_gain_max = 0;
 
-	//this sensor will set line and gain in kernel driver.
-	//we need set those value
-	turning_data.normal.param_hold = IMX415_PARAM_HOLD;	//for imx415
-	turning_data.normal.param_hold_length = 1;
-	turning_data.normal.s_line = IMX415_LINE;	//0x3050
-	turning_data.normal.s_line_length = 3;		//0x3050 [0:7] 0x3051 [0:7] 0x3052 [0:3]
-
-	// if (ratio < 0) ratio = -ratio
-	// line = (uint32_t)((offset > ((ratio * input_line) >> 8)) ? (offset - ((ratio * input_line) >> 8)) : 0)
-	turning_data.normal.line_p.ratio = -256;
-	turning_data.normal.line_p.offset = 2246;
-	turning_data.normal.line_p.max = 2237;
-
-	turning_data.normal.again_control_num = 1;
-	turning_data.normal.again_control[0] = IMX415_GAIN;
-	turning_data.normal.again_control_length[0] = 1;
 
 	//sensor bit && bayer
-	sensor_data_bayer_fill(&turning_data.sensor_data, 10, (uint32_t)BAYER_START_B, (uint32_t)BAYER_PATTERN_RGGB);
+	sensor_data_bayer_fill(&turning_data.sensor_data, 10, (uint32_t)BAYER_START_GB, (uint32_t)BAYER_PATTERN_RGGB);
 	// sensor exposure_max_bit, maybe not used ?  //FIXME
 	sensor_data_bits_fill(&turning_data.sensor_data, 12);
 
@@ -381,7 +421,8 @@ static int imx415_dol2_data_init(sensor_info_t *sensor_info)
 static int sensor_userspace_control(uint32_t port, uint32_t *enable)
 {
 	vin_info("enable userspace gain control and line control\n");
-	*enable = 0;	//imx415 use kernel space gain contrl and line control
+	// *enable = 0;	//imx415 use kernel space gain contrl and line control
+	*enable = HAL_GAIN_CONTROL | HAL_LINE_CONTROL;
 	return 0;
 }
 
@@ -399,5 +440,7 @@ sensor_module_t imx415 = {
 	.deinit = sensor_deinit,
 	.power_on = sensor_poweron,
 	.power_off = sensor_poweroff,
+	.aexp_gain_control = sensor_aexp_gain_control,
+	.aexp_line_control = sensor_aexp_line_control,
 	.userspace_control = sensor_userspace_control,
 };
