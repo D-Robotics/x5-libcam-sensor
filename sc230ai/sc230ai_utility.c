@@ -249,6 +249,9 @@ int sc230ai_linear_data_init(sensor_info_t *sensor_info)
         turning_data.sensor_data.exposure_time_long_max = 2 * VTS_VALUE - 8;  //2*frame_length - 8  //linear not use
         turning_data.sensor_data.analog_gain_max = 251; //we use again + dig fine gain
         turning_data.sensor_data.digital_gain_max = 0;
+	turning_data.sensor_data.analog_gain_init = 64;
+	turning_data.sensor_data.digital_gain_init = 0;
+	turning_data.sensor_data.exposure_time_init = 377;
 
         //sensor bit && bayer
         sensor_data_bayer_fill(&turning_data.sensor_data, 10, (uint32_t)BAYER_START_B, (uint32_t)BAYER_PATTERN_RGGB);
