@@ -135,10 +135,13 @@ typedef struct sensor_data {
 	uint32_t  gain_max;
 	uint32_t  lines_per_second;
 	uint32_t  analog_gain_max;
+	uint32_t  analog_gain_init;
 	uint32_t  digital_gain_max;
+	uint32_t  digital_gain_init;
 	uint32_t  exposure_time_max;
 	uint32_t  exposure_time_min;
 	uint32_t  exposure_time_long_max;
+	uint32_t  exposure_time_init;
 	uint32_t  active_width;
 	uint32_t  active_height;
 #ifndef COMP_XJ3_CAM
