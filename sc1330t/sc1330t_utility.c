@@ -377,7 +377,7 @@ int sc1330t_dol2_data_init(sensor_info_t *sensor_info)
 	// turning sensor_data
 	turning_data.sensor_data.turning_type = 6;
 	turning_data.sensor_data.lines_per_second = 75000;	//vts*fps=2500*30=75000
-	turning_data.sensor_data.exposure_time_max = 544;	//short frame:
+	turning_data.sensor_data.exposure_time_max = 538;	//short frame: max 7.17ms
 	turning_data.sensor_data.exposure_time_long_max = 1500;	//long frame: 20ms
 
 	turning_data.sensor_data.active_width = 1280;
@@ -529,7 +529,7 @@ static int sensor_aexp_gain_control(hal_control_info_t *info, uint32_t mode, uin
 		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, S_AGAIN_LOW, s_lower_again_reg_value);
 		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, S_AGAIN_HIGH, s_high_again_reg_value);
 		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, S_DGAIN_LOW, s_lower_dgain_reg_value);
-		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, S_DGAIN_LOW, s_high_dgain_reg_value);
+		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, S_DGAIN_HIGH, s_high_dgain_reg_value);
 
 	} else {
 		vin_err(" unsupport mode %d\n", mode);
@@ -574,9 +574,9 @@ static int sensor_aexp_line_control(hal_control_info_t *info, uint32_t mode, uin
 		temp2 = (lline & 0x0F) << 4;
 		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, EXP_LINE2, temp2);
 
-		uint32_t sline = line[1];	//short frame
-		if ( sline > 544) {
-			sline = 544;
+		uint32_t sline = line[1];	//short frame 7.17ms
+		if ( sline > 538) {
+			sline = 538;
 		}
 		temp0 = (sline & 0xFF0) >> 4;
 		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, S_EXP_LINE0, temp0);
