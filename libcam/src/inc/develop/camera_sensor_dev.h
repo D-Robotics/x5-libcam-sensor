@@ -401,6 +401,7 @@ typedef struct sensor_tuning_data {
 	stream_ctrl_t stream_ctrl;
 	sensor_data_t sensor_data;
 	sensor_led_t led_info;
+	uint32_t  af_mode;
 }sensor_tuning_data_t;
 
 /**
