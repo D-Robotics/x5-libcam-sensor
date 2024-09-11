@@ -298,6 +298,9 @@ static int imx415_linear_data_init(sensor_info_t *sensor_info)
 	turning_data.sensor_data.exposure_time_min = 8;
 	turning_data.sensor_data.analog_gain_max = 255;
 	turning_data.sensor_data.digital_gain_max = 0;
+	turning_data.sensor_data.analog_gain_init = 32;
+	turning_data.sensor_data.digital_gain_init = 0;
+	turning_data.sensor_data.exposure_time_init = 2430;
 
 
 	//sensor bit && bayer
