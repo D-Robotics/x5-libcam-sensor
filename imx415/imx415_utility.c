@@ -92,12 +92,19 @@ static int sensor_init(sensor_info_t *sensor_info)
 	switch(sensor_info->sensor_mode) {
 		case NORMAL_M:	  // 1: normal
 			vin_info("imx415 in normal/linear mode\n");
-			vin_info("bus_num = %d, sensor_addr = 0x%0x, fps = %d\n",
-				sensor_info->bus_num, sensor_info->sensor_addr, sensor_info->fps);
+			vin_info("bus_num = %d, sensor_addr = 0x%0x, fps = %d, config_index = %d\n",
+				sensor_info->bus_num, sensor_info->sensor_addr, sensor_info->fps, sensor_info->config_index);
 			if (sensor_info->fps == 30) {
-				setting_size = sizeof(imx415_init_3840x2160_linear_setting) / sizeof(uint32_t) / 2;
-				ret = vin_write_array(sensor_info->bus_num, sensor_info->sensor_addr, REG_WIDTH,
-					setting_size, imx415_init_3840x2160_linear_setting);
+				if(sensor_info->config_index == 0){ // 0: 2lane (default is 0)
+					setting_size = sizeof(imx415_init_3840x2160_2lane_linear_setting) / sizeof(uint32_t) / 2;
+					ret = vin_write_array(sensor_info->bus_num, sensor_info->sensor_addr, REG_WIDTH,
+						setting_size, imx415_init_3840x2160_2lane_linear_setting);
+				}else{// 1: 4lane
+					setting_size = sizeof(imx415_init_3840x2160_4lane_linear_setting) / sizeof(uint32_t) / 2;
+					ret = vin_write_array(sensor_info->bus_num, sensor_info->sensor_addr, REG_WIDTH,
+						setting_size, imx415_init_3840x2160_4lane_linear_setting);
+				}
+
 				if (ret < 0) {
 					vin_err("%d : init %s fail\n", __LINE__, sensor_info->sensor_name);
 					return -HB_CAM_I2C_WRITE_FAIL;
