@@ -22,6 +22,7 @@
 #include "inc/sensor_effect_common.h"
 #include "hb_camera_data_config.h"
 
+
 int sc231ai_linear_data_init(sensor_info_t *sensor_info);
 static int32_t sensor_dynamic_switch_fps(sensor_info_t *sensor_info, uint32_t fps);
 static int32_t sensor_update_fps_notify_driver(sensor_info_t *sensor_info);
@@ -288,9 +289,10 @@ static int sensor_aexp_gain_control(hal_control_info_t *info, uint32_t mode, uin
         printf("test %s, mode = %d gain_num = %d again[0] = %d, dgain[0] = %d\n", __FUNCTION__, mode, gain_num, again[0], dgain[0]);
 #endif
         const uint16_t AGAIN = 0x3e08;
+        const uint16_t AFINE_GAIN = 0x3e09;
         const uint16_t DGAIN = 0x3e06;
         const uint16_t DFINE_GAIN = 0x3e07;
-        char again_reg_value = 0;
+        char again_reg_value = 0,a_fine_gain_reg_value = 0;
         char dgain_reg_value = 0, d_fine_gain_reg_value = 0;
         int gain_index = 0;
 
@@ -300,16 +302,17 @@ static int sensor_aexp_gain_control(hal_control_info_t *info, uint32_t mode, uin
                 else
                         gain_index = again[0];
 
-                again_reg_value = (sc231ai_gain_lut[gain_index] >> 16) & 0x000000FF;
+                again_reg_value = (sc231ai_gain_lut[gain_index] >> 24) & 0x000000FF;
+                a_fine_gain_reg_value = (sc231ai_gain_lut[gain_index] >> 16) & 0x000000FF;
                 dgain_reg_value = (sc231ai_gain_lut[gain_index] >> 8) & 0x000000FF;
                 d_fine_gain_reg_value = sc231ai_gain_lut[gain_index] & 0x000000FF;
 
 #ifdef AE_DBG
-                printf("%s, gain_index: %d, again: 0x3e08 = 0x%x  dgain: 0x3e06 = 0x%x dfine gain: 0x3e07 = 0x%x\n",
-                                __FUNCTION__, gain_index, again_reg_value, dgain_reg_value, d_fine_gain_reg_value);
+                printf("%s, gain_index: %d, again: 0x3e08 = 0x%x adfine: 0x3e09 = 0x%x dgain: 0x3e06 = 0x%x dfine gain: 0x3e07 = 0x%x\n",
+                                __FUNCTION__, gain_index, again_reg_value, a_fine_gain_reg_value,dgain_reg_value, d_fine_gain_reg_value);
         #endif
                 vin_i2c_write8(info->bus_num, 16, info->sensor_addr, AGAIN, again_reg_value);
-                // vin_i2c_write8(info->bus_num, 16, info->sensor_addr, AFINE_GAIN, a_fine_gain_reg_value);
+                vin_i2c_write8(info->bus_num, 16, info->sensor_addr, AFINE_GAIN, a_fine_gain_reg_value);
                 vin_i2c_write8(info->bus_num, 16, info->sensor_addr, DGAIN, dgain_reg_value);
                 vin_i2c_write8(info->bus_num, 16, info->sensor_addr, DFINE_GAIN, d_fine_gain_reg_value);
         } else	{
@@ -343,8 +346,11 @@ static int sensor_aexp_line_control(hal_control_info_t *info, uint32_t mode, uin
                         * exposure_time_max = 2 * VTS - 8, 10fps, result = 11250 * 2 - 8
                         * so, we should limit sline = 674
                         */
-                if ( sline > 674) {
-                        sline = 674;
+                if ( sline > 2300) {
+                        sline = 2300;
+                }
+                if ( sline < 16) {
+                        sline = 16;
                 }
 
                 temp0 = (sline >> 12) & 0x0F;
