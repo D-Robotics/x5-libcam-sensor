@@ -18,6 +18,7 @@
 #include "../hb_i2c.h"
 #include "inc/ov2778_setting.h"
 #include "inc/sensor_effect_common.h"
+#include "hb_camera_data_config.h"
 
 #define OV2778_AGAIN           0x30bb
 #define OV2778_VTS_HI          0x30b2
@@ -25,46 +26,11 @@
 #define OV2778_EXP_HIGH_BYTE   0x30b6
 #define OV2778_EXP_LOW_BYTE    0x30b7
 
-#define GPIO_BASE     0x34120000
-
 #define MCLK (24000000)
 static int power_ref;
 static int ov2778_linear_data_init(sensor_info_t *sensor_info);
 int sensor_poweron(sensor_info_t *sensor_info)
 {
-        uint32_t gpio_base, gpio_val, gpio_curr_val;
-        int fd;
-        unsigned char *gpio_addr;
-        int32_t sensor_index = 0;
-
-        sensor_index = sensor_info->entry_num;
-        gpio_base = 1 << (11 + sensor_index);
-        gpio_val  = 1 << (11 + sensor_index);
-
-        fd = open("/dev/mem", O_RDWR);
-        if (fd < 0) {
-                printf("open /dev/mem failed\n");
-                return -1;
-        }
-
-        gpio_addr = (unsigned char *)mmap(NULL, 0x1000, PROT_READ | PROT_WRITE, MAP_SHARED, fd, GPIO_BASE);
-        gpio_curr_val = *(unsigned int *)(gpio_addr + 0x04);
-        *(unsigned int *)(gpio_addr + 0x04) = gpio_base | gpio_curr_val;
-
-        usleep(200 * 1000);
-
-        gpio_curr_val = *(unsigned int *)gpio_addr;
-        *(unsigned int *)gpio_addr = gpio_val | gpio_curr_val;
-
-        usleep(200 * 1000);
-
-        if (fd)
-                close(fd);
-
-        munmap(gpio_addr, 0x1000);
-
-        usleep(200 * 1000);
-
         return 0;
 }
 
@@ -80,7 +46,7 @@ int sensor_init(sensor_info_t *sensor_info)
         ret = sensor_poweron(sensor_info);
         if (ret < 0) {
                         pr_err("%d : sensor poweron %s fail\n",
-                                                __LINE__, sensor_info->sensor_name);
+                                __LINE__, sensor_info->sensor_name);
                         return ret;
         }
 
@@ -118,13 +84,28 @@ int sensor_init(sensor_info_t *sensor_info)
                 return -RET_ERROR;
         }
 
-        if (sensor_info->format == 0x2c)
-                hb_vin_i2c_write_reg16_data8(sensor_info->bus_num, sensor_info->sensor_addr, OV2778_INTF_CTRL0, 0x08);
-        else {
+        if (sensor_info->format == 0x2c) {
+                if (sensor_info->sensor_mode == PWL_M) {
+                        hb_vin_i2c_write_reg16_data8(sensor_info->bus_num, sensor_info->sensor_addr, OV2778_INTF_CTRL0, 0x02);
+                } else if (sensor_info->sensor_mode == NORMAL_M) {
+                        hb_vin_i2c_write_reg16_data8(sensor_info->bus_num, sensor_info->sensor_addr, OV2778_INTF_CTRL0, 0x08);
+                } else {
+                        pr_err("unsupported sensor mode\n");
+                        return -RET_ERROR;
+                }
+        } else {
                 pr_err("unsupported format\n");
                 return -RET_ERROR;
         }
         // hb_vin_i2c_write_reg16_data8(sensor_info->bus_num, sensor_info->sensor_addr, OV2778_ISP_PRE_CTL, 0x80);
+
+        if (sensor_info->sensor_mode == PWL_M) {
+                hb_vin_i2c_write_reg16_data8(sensor_info->bus_num, sensor_info->sensor_addr, 0x30b6, 0x00);
+                hb_vin_i2c_write_reg16_data8(sensor_info->bus_num, sensor_info->sensor_addr, 0x30b7, 0x80);
+                hb_vin_i2c_write_reg16_data8(sensor_info->bus_num, sensor_info->sensor_addr, 0x315a, 0x01);
+                hb_vin_i2c_write_reg16_data8(sensor_info->bus_num, sensor_info->sensor_addr, 0x30bb, 0x00);
+        }
+
 
         ret = ov2778_linear_data_init(sensor_info);
         if (ret < 0) {
@@ -206,6 +187,9 @@ void ov2778_common_data_init(sensor_info_t *sensor_info, sensor_turning_data_t *
         turning_data->sensor_addr = sensor_info->sensor_addr;
         strncpy(turning_data->sensor_name, sensor_info->sensor_name,
                 sizeof(turning_data->sensor_name));
+        if (sensor_info->sensor_mode == PWL_M)
+                turning_data->pwl.l_s_mode = 0;
+
         return;
 }
 
