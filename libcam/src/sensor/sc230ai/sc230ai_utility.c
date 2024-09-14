@@ -244,7 +244,7 @@ int sc230ai_linear_data_init(sensor_info_t *sensor_info)
         // from customer, max 10ms
         // 1000ms -lines_per_second - 33750
         // 10ms - 337, 33ms - 1125
-        turning_data.sensor_data.exposure_time_max = 377; //from customer, max 10ms
+        turning_data.sensor_data.exposure_time_max = 1012; //from customer, max 10ms
         turning_data.sensor_data.exposure_time_min = 1;
         turning_data.sensor_data.exposure_time_long_max = 2 * VTS_VALUE - 8;  //2*frame_length - 8  //linear not use
         turning_data.sensor_data.analog_gain_max = 251; //we use again + dig fine gain
@@ -368,8 +368,8 @@ static int sensor_aexp_line_control(hal_control_info_t *info, uint32_t mode, uin
                         * exposure_time_max = 2 * VTS - 8, 10fps, result = 11250 * 2 - 8
                         * so, we should limit sline = 674
                         */
-                if ( sline > 674) {
-                        sline = 674;
+                if ( sline > 2022) {
+                        sline = 2022;
                 }
 
                 temp0 = (sline >> 12) & 0x0F;
