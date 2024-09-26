@@ -282,7 +282,7 @@ static int ov16e10_linear_data_init(sensor_info_t *sensor_info)
         ov16e10_common_data_init(sensor_info, &turning_data);
         ov16e10_normal_data_init(sensor_info, &turning_data);
 
-        sensor_data_bayer_fill(&turning_data.sensor_data, 10, (uint32_t)BAYER_START_B, (uint32_t)BAYER_PATTERN_RGGB);
+        sensor_data_bayer_fill(&turning_data.sensor_data, 10, (uint32_t)BAYER_START_GB, (uint32_t)BAYER_PATTERN_RGGB);
         sensor_data_bits_fill(&turning_data.sensor_data, 12);
 
         turning_data.sensor_data.analog_gain_max = 192;
