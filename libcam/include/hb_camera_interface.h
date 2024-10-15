@@ -286,6 +286,35 @@ extern int32_t hbn_camera_read_register(camera_handle_t cam_fd, camera_reg_type_
 /**
  * @NO{S10E02C01I}
  * @ASIL{B}
+ * @brief write register value to camera hardware
+ * @detail the hardware info should configed in camera_config when created.
+ *         the type should adapt the camera sensor used.
+ *
+ * @param[in] cam_fd: camera handle which create returned
+ *         range: [!NULL, !NULL], default: NA
+ * @param[in] type: device type of camera sensor
+ *         range: [CAMERA_SENSOR_REG], CAMERA_EEPROM_REG], default: NA
+ * @param[in] reg_addr: address of register to write
+ *         range: [0x0, 0xFFFF], default: NA
+ * @param[in] value: value of register to write
+ *         range: [0x0, 0xFFFF], default: NA
+ *
+ * @return 0:Success, <0:Failure
+ *
+ * @data_write None
+ * @data_updated None
+ * @compatibility HW: J6
+ * @compatibility SW: 1.0.0
+ *
+ * @callgraph
+ * @callergraph
+ * @design
+ */
+extern int32_t hbn_camera_write_register(camera_handle_t cam_fd, camera_reg_type_t type, uint32_t reg_addr, uint32_t value);
+
+/**
+ * @NO{S10E02C01I}
+ * @ASIL{B}
  * @brief parse the embedded raw data to embed_info struct
  * @detail only valid if sensor lib support corresponding function.
  *

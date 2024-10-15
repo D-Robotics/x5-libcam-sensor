@@ -2004,6 +2004,109 @@ int32_t camera_sensor_read_register(sensor_info_t *sen_if, camera_reg_type_t typ
 	return ret;
 }
 
+
+/**
+ * @NO{S10E02C04I}
+ * @ASIL{B}
+ * @brief sensor module write register to hw
+ *
+ * @param[in] sen_if: sensor moudle struct
+ * @param[in] type: the reg type to write
+ * @param[in] reg_addr: the reg addr to write
+ * @param[in] value: the value to write
+ *
+ * @return 0:Success, <0:Failure
+ *
+ * @data_write None
+ * @data_updated None
+ * @compatibility None
+ *
+ * @callgraph
+ * @callergraph
+ * @design
+ */
+int32_t camera_sensor_write_register(sensor_info_t *sen_if, camera_reg_type_t type, uint32_t reg_addr, uint32_t value)
+{
+	int32_t ret, good = 0, error = 0;
+	int32_t sindex;
+	char *sname;
+	int32_t dlen, alen;
+	uint32_t bus;
+	uint8_t addr;
+
+	if (sen_if == NULL)
+		return -RET_ERROR;
+	camera_debug_call_cami(sen_if->port);
+	sindex = sen_if->port;
+	sname = sen_if->sensor_name;
+	bus = (uint32_t)sen_if->bus_num;
+
+	ret = camera_run_cam_get(sindex, &good, NULL, NULL, NULL);
+	if ((ret < 0) || (good == 0)) {
+		cam_err("sensor%d %s not good for read_register %d 0x%x error %d\n",
+			sindex, sname, type, reg_addr, ret);
+		return -RET_ERROR;
+	}
+
+	switch (type) {
+		case CAMERA_SERIAL_REG:
+			addr = (uint8_t)sen_if->serial_addr;
+			alen = SENSOR_FV_ALEN(sen_if);
+			dlen = SENSOR_FV_DLEN(sen_if);
+			break;
+		case CAMERA_EEPROM_REG:
+			addr = (uint8_t)sen_if->eeprom_addr;
+			alen = 16;
+			dlen = 8;
+			break;
+		case CAMERA_SENSOR_REG:
+			addr = (uint8_t)sen_if->sensor_addr;
+			alen = SENSOR_FV_ALEN(sen_if);
+			dlen = SENSOR_FV_DLEN(sen_if);
+			break;
+		default:
+			cam_err("sensor%d %s read_register type %d error\n",
+				sindex, sname, type);
+			return -RET_ERROR;
+	}
+
+	if (reg_addr >= (0x1UL << alen)) {
+		cam_err("sensor%d %s write_register reg_addr 0x%x error\n",
+			sindex, sname, reg_addr);
+		return -RET_ERROR;
+	}
+
+	if (alen == 8) {
+		if (dlen == 8)
+			ret = camera_i2c_write_reg8_data8(bus, addr, (uint16_t)reg_addr, (uint8_t)value);
+		else if (dlen == 16)
+			ret = camera_i2c_write_reg8_data16(bus, addr, (uint16_t)reg_addr, (uint16_t)value);
+		else
+			error = 1;
+	} else if (alen == 16) {
+		if (dlen == 8)
+			ret = camera_i2c_write_reg16_data8(bus, addr, (uint16_t)reg_addr, (uint8_t)value);
+		else if (dlen == 16)
+			ret = camera_i2c_write_reg16_data16(bus, addr, (uint16_t)reg_addr, (uint16_t)value);
+		else
+			error = 1;
+	} else {
+		error = 1;
+	}
+
+	if (error != 0) {
+		cam_err("sensor%d %s write_register type %d alen %d dlen %d error\n",
+			sindex, sname, type, alen, dlen);
+		return -RET_ERROR;
+	}
+	if (ret < 0)
+		cam_err("sensor%d %s write_register type %d reg_addr 0x%x 0x%x error %d\n",
+			sindex, sname, type, reg_addr, value, ret);
+
+	camera_debug_call_camo(sen_if->port);
+	return ret;
+}
+
 /**
  * @NO{S10E02C04I}
  * @ASIL{B}
