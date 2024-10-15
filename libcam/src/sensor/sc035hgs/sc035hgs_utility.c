@@ -305,15 +305,18 @@ int sc035hgs_linear_data_init(sensor_info_t *sensor_info)
 	 * */
 	turning_data.sensor_data.lines_per_second = 37500; // fps * vts = 30 * 1250 = 37500
 	// from customer, exposure max = 10ms, exposure_time_max = lines_per_second / 100 = 375
-	turning_data.sensor_data.exposure_time_max = 375; // from customer
-	turning_data.sensor_data.exposure_time_min = 8;	  // trigger mode, value read from 0x3226
+	turning_data.sensor_data.exposure_time_max = 1250 - 480; // from customer(trigger need 1/trigfreq - readtime)
+	turning_data.sensor_data.exposure_time_min = 0;	  // trigger mode, value read from 0x3226
 													  // sensor AGC decided by 0x3e03
 #ifdef AE_DBG
 	temp = hb_vin_i2c_read_reg16_data8(sensor_info->bus_num, sensor_info->sensor_addr, 0x3e03);
 	printf("%s read AGC 0x3e03 = 0x%x \n", __FUNCTION__, temp);
 #endif
-	turning_data.sensor_data.analog_gain_max = 63; // from sensor fae, gain lut index
-	turning_data.sensor_data.digital_gain_max = 0; // from sensor fae, gain lut index
+	turning_data.sensor_data.analog_gain_max = 126; // from sensor fae, gain lut index
+	turning_data.sensor_data.digital_gain_max = 94; // from sensor fae, gain lut index
+	turning_data.sensor_data.analog_gain_init = 32;
+	turning_data.sensor_data.digital_gain_init = 32;
+	turning_data.sensor_data.exposure_time_init = 399;
 
 	// raw10
 	sensor_data_bayer_fill(&turning_data.sensor_data, 10, (uint32_t)BAYER_START_B, (uint32_t)BAYER_PATTERN_RGGB);
@@ -525,6 +528,8 @@ static int sensor_aexp_gain_control(hal_control_info_t *info, uint32_t mode, uin
 #ifdef AE_DBG
 	printf("%s %s mode:%d gain_num:%d again[0]:%x, dgain[0]:%x\n", __FILE__, __FUNCTION__, mode, gain_num, again[0], dgain[0]);
 #endif
+#define AGAIN_COARSE_MASK  0X1C
+#define DGAIN_DIGITAL_MASK 0X03
 	const uint16_t AGAIN_LOW = 0x3e08;
 	const uint16_t AGAIN_HIGH = 0x3e09;
 	const uint16_t DGAIN_LOW = 0x3e06;
@@ -532,21 +537,62 @@ static int sensor_aexp_gain_control(hal_control_info_t *info, uint32_t mode, uin
 	char lower_again_reg_value = 0, high_again_reg_value = 0;
 	char lower_dgain_reg_value = 0, high_dgain_reg_value = 0;
 	int again_index = 0, dgain_index = 0;
+	uint32_t       low_again_default_value = 0x3;
+    uint32_t       low_dgain_default_value = 0xc;
+    int            setting_size            = 0;
+    uint32_t      *sensor_setting_array    = NULL;
+	
+	switch (mode)
+    {
+        case NORMAL_M:
+            setting_size         = sizeof(sc035hgs_linear_init_master_setting) / sizeof(uint32_t);
+            sensor_setting_array = sc035hgs_linear_init_master_setting;
+            break;
+        case DOL2_M:
+            setting_size         = sizeof(sc035hgs_hdr_init_setting) / sizeof(uint32_t);
+            sensor_setting_array = sc035hgs_hdr_init_setting;
+            break;
+        case SLAVE_M:
+            setting_size         = sizeof(sc035hgs_linear_init_slave_setting) / sizeof(uint32_t);
+            sensor_setting_array = sc035hgs_linear_init_slave_setting;
+            break;
+        default:
+        {
+            vin_err(" unsupport mode %d\n", mode);
+            return -1;
+        }
+    }
+
+    for (int i = 0; i < setting_size; i += 2)
+    {
+        if (sensor_setting_array[i] == AGAIN_LOW)
+        {
+            low_again_default_value = sensor_setting_array[i + 1];
+        }
+        if (sensor_setting_array[i] == DGAIN_LOW)
+        {
+            low_dgain_default_value = sensor_setting_array[i + 1];
+        }
+    }
+
+    low_again_default_value = (low_again_default_value & ~AGAIN_COARSE_MASK);
+    low_dgain_default_value = (low_dgain_default_value & ~DGAIN_DIGITAL_MASK);
+	
 	if (mode == NORMAL_M || mode == DOL2_M || mode == SLAVE_M)
 	{
-		if (again[0] >= 127)
-			again_index = 127;
+		if (again[0] >= 126)
+			again_index = 126;
 		else
 			again_index = again[0];
 
-		if (dgain[0] >= 95)
-			dgain_index = 95;
+		if (dgain[0] >= 94)
+			dgain_index = 94;
 		else
 			dgain_index = dgain[0];
 
-		lower_again_reg_value = (sc035hgs_again_lut0[again_index] << 2) & 0x000000FF;
+		lower_again_reg_value = ((sc035hgs_again_lut0[again_index] << 2) & 0x000000FF) | low_again_default_value;
 		high_again_reg_value = sc035hgs_again_lut1[again_index] & 0x000000FF;
-		lower_dgain_reg_value = sc035hgs_dgain_lut0[dgain_index] & 0x000000FF;
+		lower_dgain_reg_value = (sc035hgs_dgain_lut0[dgain_index] & 0x000000FF) | low_dgain_default_value;
 		high_dgain_reg_value = sc035hgs_dgain_lut1[dgain_index] & 0x000000FF;
 #ifdef AE_DBG
 		printf("%s again(0x3e08/0x3e09):%x,%x; dgain(0x3e06x3e07):%x,%x\n",
@@ -588,13 +634,13 @@ static int sensor_aexp_line_control(hal_control_info_t *info, uint32_t mode, uin
 		 * exposure_time_max =  1/fps - readout(480line) = 33ms- 480line = lines_per_second/30 - 480 = 1250 - 480 = 770
 		 * from customer, exposure time max is 10ms，sline = exposure_time_max = 375
 		 */
-		if (sline < 8)
+		if (sline < 0)
 		{
-			sline = 8;
+			sline = 0;
 		}
-		else if (sline > 375)
+		else if (sline > 770)
 		{
-			sline = 375;
+			sline = 770;
 		}
 		temp0 = (sline >> 4) & 0xFF;
 		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, EXP_LINE0, temp0);
