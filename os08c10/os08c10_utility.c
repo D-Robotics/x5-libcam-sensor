@@ -28,6 +28,8 @@
 #define OS08C10_EXP_HIGH_BYTE  0x3501
 #define OS08C10_EXP_LOW_BYTE  0x3502
 
+#define USE_DAG_HDR 1
+
 static int os08c10_linear_data_init(sensor_info_t *sensor_info);
 int sensor_poweron(sensor_info_t *sensor_info)
 {
@@ -73,11 +75,19 @@ int sensor_init(sensor_info_t *sensor_info)
 	// set resolution and format
 	if (sensor_info->resolution == 2160) {
 			pr_debug("os08c10 resolution is 2160 \n");
+#if USE_DAG_HDR
+			setting_size =
+					sizeof(os08c10_3840x2160_30fps_27MHz_linear_12bit_1620Mbps_2lane) / sizeof(uint32_t) / 2;
+			ret = vin_write_array(sensor_info->bus_num,
+									sensor_info->sensor_addr, 2,
+									setting_size, os08c10_3840x2160_30fps_27MHz_linear_12bit_1620Mbps_2lane);
+#else
 			setting_size =
 					sizeof(os08c10_3840x2160_30fps_27MHz_linear_12bit_1701Mbps_2lane) / sizeof(uint32_t) / 2;
 			ret = vin_write_array(sensor_info->bus_num,
 									sensor_info->sensor_addr, 2,
 									setting_size, os08c10_3840x2160_30fps_27MHz_linear_12bit_1701Mbps_2lane);
+#endif
 			if (ret < 0) {
 				pr_err("%d : init %s fail\n",
 						__LINE__, sensor_info->sensor_name);
@@ -262,26 +272,58 @@ static int sensor_aexp_gain_control(hal_control_info_t *info, uint32_t mode, uin
 #ifdef AE_DBG
 	printf("test %s, mode = %d gain_num = %d again[0] = %d, dgain[0] = %d\n", __FUNCTION__, mode, gain_num, again[0], dgain[0]);
 #endif
-	const uint16_t AGAIN_H = 0x3508;
-	const uint16_t AGAIN_L = 0x3509;
+	/*
+	Customer Requirements: 
+	The gain needs to be set to both high gain and low gain. 
+	The range for high gain is 8x-16x, and the range for low gain is 1x-2x, 
+	with the condition that high gain / low gain = 8.
+	*/
+	//short frame
+	const uint16_t AGAIN_H = 0x3548;//again
+	const uint16_t AGAIN_L = 0x3549;
+	//long frame
+	const uint16_t DAG_AGAIN_H = 0x3508;
+	const uint16_t DAG_AGAIN_L = 0x3509;
+
 	char again_reg_value_h = 0,again_reg_value_l = 0;
 	int gain_index = 0;
 
 	if (mode == NORMAL_M) {
 		if (again[0] >= sizeof(os08c10_gain_lut)/sizeof(uint32_t))
-		gain_index = sizeof(os08c10_gain_lut)/sizeof(uint32_t) - 1;
-	else
-		gain_index = again[0];
-
-	again_reg_value_h = (os08c10_gain_lut[gain_index] >> 8) & 0x7F;
-	again_reg_value_l = (os08c10_gain_lut[gain_index]) & 0xFE;
-
+			gain_index = sizeof(os08c10_gain_lut)/sizeof(uint32_t) - 1;
+		else
+			gain_index = again[0];
 #ifdef AE_DBG
-	printf("%s, gain_index: %d, again_h:0x3508 = 0x%x, again_l:0x3509 = 0x%x\n",
-	__FUNCTION__, gain_index, again_reg_value_h,again_reg_value_l);
+		printf("%s, gain_index: %d, again_h:0x3548 = 0x%x, again_l:0x3549 = 0x%x\n",
+		__FUNCTION__, gain_index, again_reg_value_h,again_reg_value_l);
 #endif
-	vin_i2c_write8(info->bus_num, 16, info->sensor_addr, AGAIN_H, again_reg_value_h);
-	vin_i2c_write8(info->bus_num, 16, info->sensor_addr, AGAIN_L, again_reg_value_l);
+
+#if USE_DAG_HDR
+		//限制1x-2x
+		if(gain_index < 0){
+			gain_index = 0;
+		}
+		else if(gain_index > 32){
+			gain_index = 32;
+		}else{
+
+		}
+		//high gain
+		again_reg_value_h = (os08c10_gain_lut[gain_index] >> 8) & 0x7F;
+		again_reg_value_l = (os08c10_gain_lut[gain_index]) & 0xFE;
+		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, AGAIN_H, again_reg_value_h);
+		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, AGAIN_L, again_reg_value_l);
+
+		//low gain
+		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, DAG_AGAIN_H, (again_reg_value_h<<3));
+		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, DAG_AGAIN_L, (again_reg_value_l<<3));
+
+#else
+		again_reg_value_h = (os08c10_gain_lut[gain_index] >> 8) & 0x7F;
+		again_reg_value_l = (os08c10_gain_lut[gain_index]) & 0xFE;
+		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, AGAIN_H, again_reg_value_h);
+		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, AGAIN_L, again_reg_value_l);
+#endif
 	} else	{
 		vin_err(" unsupport mode %d\n", mode);
 	}
@@ -315,10 +357,22 @@ static int sensor_aexp_line_control(hal_control_info_t *info, uint32_t mode, uin
 
 		temp0 = (sline >> 16) & 0xFF;
 		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, EXP_LINE0, temp0);
+#if USE_DAG_HDR
+		const uint16_t DAG_EXP_LINE0 = 0x3540;//Always set 3540 = 3500
+		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, DAG_EXP_LINE0, temp0);
+#endif
 		temp1 = (sline >> 8) & 0x0F;
 		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, EXP_LINE1, temp1);
+#if USE_DAG_HDR
+		const uint16_t DAG_EXP_LINE1 = 0x3541;//Always set 3541 = 3501
+		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, DAG_EXP_LINE1, temp1);
+#endif
 		temp2 = (sline) & 0xFF;
 		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, EXP_LINE2, temp2);
+#if USE_DAG_HDR
+		const uint16_t DAG_EXP_LINE2 = 0x3542;//Always set 3542 = 3502
+		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, DAG_EXP_LINE2, temp2);
+#endif
 
 #ifdef AE_DBG
 		printf("write sline = %d, 0x3500 = 0x%x, 0x3501 = 0x%x,0x3502 = 0x%x\n",
