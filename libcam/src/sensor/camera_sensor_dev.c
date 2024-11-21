@@ -234,6 +234,28 @@ static int32_t camera_sensor_dev_ioctl(sensor_info_t *sen_if, int32_t cmd, void 
 }
 
 /**
+ * @brief sensro otp data struct updata to driver
+ *
+ * @param[in] sen_if: sensor_info struct
+ * @param[out] pdata: otp data struct to update
+ *
+ * @return 0:Success, <0:Failure
+ */
+int32_t camera_sensor_dev_otp_init(sensor_info_t *sen_if, sensor_otp_t *pdata)
+{
+	int32_t ret;
+
+	if ((sen_if == NULL) || (pdata == NULL))
+		return -RET_ERROR;
+	ret = camera_sensor_dev_ioctl(sen_if, SENSOR_OTP_PARAM, pdata);
+	if (ret < 0)
+		cam_err("sensor%d %s %s error %d\n", sen_if->port, sen_if->sensor_name,
+			camera_sensor_dev_ioc_name(SENSOR_OTP_PARAM), ret);
+
+	return ret;
+}
+
+/**
  * @NO{S10E02C04I}
  * @ASIL{B}
  * @brief sensro tuning data struct updata to driver
