@@ -349,9 +349,6 @@ static int sensor_aexp_line_control(hal_control_info_t *info, uint32_t mode, uin
                 if ( sline > 2300) {
                         sline = 2300;
                 }
-                if ( sline < 16) {
-                        sline = 16;
-                }
 
                 temp0 = (sline >> 12) & 0x0F;
                 vin_i2c_write8(info->bus_num, 16, info->sensor_addr, EXP_LINE0, temp0);
