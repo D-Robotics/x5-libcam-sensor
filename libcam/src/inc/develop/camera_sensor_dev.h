@@ -407,6 +407,7 @@ typedef struct sensor_tuning_data {
 /* sensor otp config */
 #define SENSOR_OTP_LSC_CT_NUM 1
 #define SENSOR_OTP_AWB_CT_NUM 3
+#define SENSOR_OTP_LSC_EEPROM_SIZE 17
 #define SENSOR_OTP_LSC_V_GRID_NUM 33
 #define SENSOR_OTP_LSC_H_GRID_NUM 33
 #define SENSOR_OTP_PDAF_FOCAL_SIZE 48
@@ -419,11 +420,14 @@ typedef enum color_temperature_e {
 } color_temperature_t;
 
 typedef struct sensor_otp_lsc_s {
-	color_temperature_t color_temperature;
-	uint16_t r[SENSOR_OTP_LSC_H_GRID_NUM][SENSOR_OTP_LSC_H_GRID_NUM];
-	uint16_t gr[SENSOR_OTP_LSC_H_GRID_NUM][SENSOR_OTP_LSC_H_GRID_NUM];
-	uint16_t gb[SENSOR_OTP_LSC_H_GRID_NUM][SENSOR_OTP_LSC_H_GRID_NUM];
-	uint16_t b[SENSOR_OTP_LSC_H_GRID_NUM][SENSOR_OTP_LSC_H_GRID_NUM];
+	uint16_t r[SENSOR_OTP_LSC_EEPROM_SIZE][SENSOR_OTP_LSC_EEPROM_SIZE];
+	uint16_t gr[SENSOR_OTP_LSC_EEPROM_SIZE][SENSOR_OTP_LSC_EEPROM_SIZE];
+	uint16_t gb[SENSOR_OTP_LSC_EEPROM_SIZE][SENSOR_OTP_LSC_EEPROM_SIZE];
+	uint16_t b[SENSOR_OTP_LSC_EEPROM_SIZE][SENSOR_OTP_LSC_EEPROM_SIZE];
+	uint16_t golden_r[SENSOR_OTP_LSC_V_GRID_NUM][SENSOR_OTP_LSC_H_GRID_NUM];
+	uint16_t golden_gr[SENSOR_OTP_LSC_V_GRID_NUM][SENSOR_OTP_LSC_H_GRID_NUM];
+	uint16_t golden_gb[SENSOR_OTP_LSC_V_GRID_NUM][SENSOR_OTP_LSC_H_GRID_NUM];
+	uint16_t golden_b[SENSOR_OTP_LSC_V_GRID_NUM][SENSOR_OTP_LSC_H_GRID_NUM];
 } sensor_otp_lsc_t;
 
 typedef struct sensor_otp_awb_s {
