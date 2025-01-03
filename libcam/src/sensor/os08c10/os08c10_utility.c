@@ -315,7 +315,7 @@ static int sensor_aexp_gain_control(hal_control_info_t *info, uint32_t mode, uin
 		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, AGAIN_L, again_reg_value_l);
 
 		//low gain
-		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, DAG_AGAIN_H, (again_reg_value_h<<3));
+		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, DAG_AGAIN_H, ((again_reg_value_h<<3)+(again_reg_value_l>>5)));
 		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, DAG_AGAIN_L, (again_reg_value_l<<3));
 
 #else
