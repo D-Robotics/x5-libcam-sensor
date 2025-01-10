@@ -68,12 +68,21 @@ static emode_data_t emode_data[MODE_TYPE_MAX] = {
 		.serial_rclk_out = 0,		// 0: serial rclk disabl, 1: serial_rclk enable
 		.rclk_mfp = 0,                // if serial_rclk_out = 1, the rclk output on rclk_mfp
 	},
+	[SENSING_M25F120D4G3_S0R0T7] = {
+		.serial_addr = 0x40,            // serial i2c addr
+		.sensor_addr = 0x10,            // sensor i2c addr
+		.eeprom_addr = 0x50,            // eeprom i2c addr
+		.serial_rclk_out = 0,           // 0: serial rclk disabl, 1: serial_rclk enable
+		.rclk_mfp = 0,			// if serial_rclk_out = 1, the rclk output on rclk_mfp
+	},
 };
 
 static const sensor_emode_type_t sensor_emode[MODE_TYPE_NUM] = {
 	SENSOR_EMADD(SUNNY_M25F120D12G3_S1R8T2, "0.0.1", "lib_CA82GB_pwl12_WS_Fov120.so", "0.22.10.20", &emode_data[SUNNY_M25F120D12G3_S1R8T2]),
 	SENSOR_EMADD(SENSING_M27F120D12G3_S0R0T7, "0.0.1", "lib_ar0820RGGB_pwl12_Sens_Fov30.so", "0.22.9.13", &emode_data[SENSING_M27F120D12G3_S0R0T7]),
 	SENSOR_EMADD(SUNNY_M25F120D12G3_S0R8T7E0, "0.0.1", "lib_CA82GB_pwl12_WS_Fov120.so", "0.22.10.20", &emode_data[SUNNY_M25F120D12G3_S0R8T7E0]),
+	//D4: YUV422, S0: MAX9295A, R0: sensor module isp reset MFP0 T7: sensor frame sync MFP7
+	SENSOR_EMADD(SENSING_M25F120D4G3_S0R0T7, "0.0.1", "lib_ar0820RGGB_pwl12_Sens_Fov30.so", "0.22.9.13", &emode_data[SENSING_M25F120D4G3_S0R0T7]),
 	SENSOR_EMEND(),
 };
 
@@ -193,6 +202,16 @@ static int32_t sensor_config_index_trig_mode(sensor_info_t *sensor_info)
 	else
 		gpio_id = sensor_info->deserial_port;
 
+	// FIXME
+	/* For RDK-S100, deserializer not link gpio to serializer,
+	 * so we not config deserializer GPIO_TX_GMSL and serializer GPIO_RX_GMSL.
+	 * We only pull up serializer TRIG_PIN MFP7 now. */
+	if ((sensor_info->extra_mode & 0xff) == SENSING_M25F120D4G3_S0R0T7) {
+		ret = max_serial_mfp_config(sensor_info->bus_num, serial_addr,
+				ser_trig_mfp, GPIO_OUT_HIGH, gpio_id);
+		return ret;
+	}
+
 	ret = maxops->mfp_cfg(deserial_if, GPIO_TX_GMSL, gpio_id, sensor_info->deserial_port);
 	if (ret < 0) {
 		vin_err("%s mfp trig config fail!!!\n", deserial_if->deserial_name);
@@ -288,6 +307,16 @@ static int32_t sensor_config_index_trig_shutter_mode(sensor_info_t *sensor_info)
 		gpio_id = 1;
 	else
 		gpio_id = sensor_info->deserial_port;
+
+	// FIXME
+	/* For RDK-S100, deserializer not link gpio to serializer,
+	 * so we not config deserializer GPIO_TX_GMSL and serializer GPIO_RX_GMSL.
+	 * We only pull up serializer TRIG_PIN MFP7 now. */
+	if ((sensor_info->extra_mode & 0xff) == SENSING_M25F120D4G3_S0R0T7) {
+		ret = max_serial_mfp_config(sensor_info->bus_num, serial_addr,
+				ser_trig_mfp, GPIO_OUT_HIGH, gpio_id);
+		return ret;
+	}
 
 	ret = maxops->mfp_cfg(deserial_if, GPIO_TX_GMSL, gpio_id, sensor_info->deserial_port);
 	if (ret < 0) {
@@ -556,6 +585,16 @@ static int32_t ar0820_init(sensor_info_t *sensor_info)
 	bus = deserial_if->bus_num;
 	deserial_addr = deserial_if->deserial_addr;
 
+	/* RDK-S100 SENSING_M25F120D4G3_S0R0T7 YUV sensor, and we don't need to config sensor.
+	 * Only serializer and MFP */
+	if ((sensor_info->extra_mode & 0xff) == SENSING_M25F120D4G3_S0R0T7) {
+		ret = sensor_config_do(sensor_info, CONFIG_INDEX_ALL, sensor_config_index_funcs);
+		if (ret < 0) {
+			vin_err("sensor config_index do fail!!!\n");
+		}
+		return ret;
+	}
+
 	/* xj3 / j5 */
 	if(sensor_info->sensor_mode == (uint32_t)NORMAL_M) {
 		pdata = ar0820_linear_30fps_init_setting;
@@ -722,6 +761,11 @@ static int32_t sensor_param_init(sensor_info_t *sensor_info,
 	uint8_t init_d[3];
 	uint32_t x0, m_y0, x1, m_y1, width, height;
 
+	/* RDK-S100 SENSING_M25F120D4G3_S0R0T7 yuv sensor. */
+	if ((sensor_info->extra_mode & 0xff) == SENSING_M25F120D4G3_S0R0T7) {
+		return ret;
+	}
+
 	ret = hb_vin_i2c_read_block_reg16(sensor_info->bus_num, (uint8_t)sensor_info->sensor_addr,
 				AR0820_VTS, init_d, 2);
 	tuning_data->sensor_data.VMAX = init_d[0];
@@ -844,6 +888,11 @@ static int32_t sensor_linear_data_init(sensor_info_t *sensor_info)
 	sensor_common_data_init(sensor_info, &tuning_data);
 	if(sensor_info->bus_type == I2C_BUS) {
 		sensor_param_init(sensor_info, &tuning_data);
+	}
+
+	/*RDK-S100 SENSING_M25F120D4G3_S0R0T7 is yuv sensor. */
+	if ((sensor_info->extra_mode & 0xff) == SENSING_M25F120D4G3_S0R0T7) {
+		return ret;
 	}
 
 	tuning_data.normal.param_hold = AR0820_PARAM_HOLD;
@@ -1072,6 +1121,12 @@ static int32_t sensor_pwl_data_init(sensor_info_t *sensor_info)
 	if(sensor_info->bus_type == I2C_BUS) {
 		sensor_param_init(sensor_info, &tuning_data);
 	}
+
+	/*RDK-S100 SENSING_M25F120D4G3_S0R0T7 is yuv sensor. */
+	if ((sensor_info->extra_mode & 0xff) == SENSING_M25F120D4G3_S0R0T7) {
+		return ret;
+	}
+
 	tuning_data.pwl.param_hold = AR0820_PARAM_HOLD;
 	tuning_data.pwl.param_hold_length = 2;
 	tuning_data.pwl.line = AR0820_LINE;
@@ -1487,6 +1542,12 @@ static int32_t sensor_diag_nodes_init(sensor_info_t *sensor_info)
 	int32_t ret;
 	uint32_t port;
 
+	//FIXME
+	/* RDK-S100 SENSING_M25F120D4G3_S0R0T7 now no diag. */
+	if ((sensor_info->extra_mode & 0xff) == SENSING_M25F120D4G3_S0R0T7) {
+		return 0;
+	}
+
 	ret = diag_voltage_node_init(sensor_info);
 	if (ret != 0) {
 		vin_err("voltage_node init error\n");
@@ -1527,6 +1588,13 @@ static int32_t sensor_init(sensor_info_t *sensor_info)
 		vin_err("%d : init %s fail\n", __LINE__, sensor_info->sensor_name);
 		return ret;
 	}
+
+	/* RDK-S100 SENSING_M25F120D4G3_S0R0T7 no errb mfp link.
+	 * And not need vlotage setting. */
+	if ((sensor_info->extra_mode & 0xff) == SENSING_M25F120D4G3_S0R0T7) {
+		return ret;
+	}
+
 #ifdef CAM_DIAG
 	ret = max_serial_errb_mfp_map(sensor_info);
 	if (ret < 0) {
@@ -1593,6 +1661,7 @@ static int32_t sensor_stop(sensor_info_t *sensor_info)
 	int32_t poc_addr = deserial_if->poc_addr;
 	int32_t sensor_addr = sensor_info->sensor_addr;
 	int32_t bus, deserial_addr;
+	int32_t ser_trig_mfp;
 
 	if (deserial_if == NULL) {
 		vin_err("no deserial here\n");
@@ -1604,6 +1673,19 @@ static int32_t sensor_stop(sensor_info_t *sensor_info)
 	/* xj3 */
 	if ((sensor_info->config_index & TRIG_SHUTTER_SYNC) ||
 		(sensor_info->config_index & TRIG_STANDARD)) {
+
+		/* RDK-S100 SENSING_M25F120D4G3_S0R0T7 yuv sensor, no stream off setting. */
+		if ((sensor_info->extra_mode & 0xff) == SENSING_M25F120D4G3_S0R0T7) {
+			ser_trig_mfp = vin_sensor_emode_parse(sensor_info, 'T');
+			if (ser_trig_mfp < 0) {
+				vin_err("sensor_mode_parse trig pin fail\n");
+				return ser_trig_mfp;
+			}
+			ret = max_serial_mfp_config(sensor_info->bus_num, serial_addr,
+				ser_trig_mfp, 0x00u, 0u);
+			return ret;
+		}
+
 		pdata = ar0820_sync_stream_off_setting;
 		setting_size = sizeof(ar0820_sync_stream_off_setting)/sizeof(uint32_t)/2;
 		ret = vin_write_array(bus, sensor_addr, REG16_VAL16, setting_size, pdata);
@@ -1990,6 +2072,10 @@ static int32_t get_intrinsic_params(sensor_info_t *si,
 static int32_t get_sns_info(sensor_info_t *si, cam_parameter_t *csp, uint8_t type)
 {
 	int32_t ret = RET_OK;
+
+	if ((si->extra_mode & 0xff) == SENSING_M25F120D4G3_S0R0T7) {
+		return ret;
+	}
 
 	switch (type) {
 	case 0:
