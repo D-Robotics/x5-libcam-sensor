@@ -142,6 +142,8 @@ int sc132gs_linear_data_init_1088x1280(sensor_info_t *sensor_info)
 	turning_data.port = sensor_info->port;
 	turning_data.reg_width = sensor_info->reg_width;
 	turning_data.mode = sensor_info->sensor_mode;
+	if (sensor_info->sensor_mode == SLAVE_M)
+		turning_data.mode = NORMAL_M;
 	turning_data.sensor_addr = sensor_info->sensor_addr;
 	strncpy(turning_data.sensor_name, sensor_info->sensor_name,
 		sizeof(turning_data.sensor_name));
@@ -405,8 +407,8 @@ int sensor_init(sensor_info_t *sensor_info)
 		switch(sensor_info->sensor_mode) {
 		case NORMAL_M:	  // 1: normal
 			vin_info("sc132gs in normal mode\n");
-			setting_size = sizeof(sc132gs_linear_init_896x896_10fps_setting) / sizeof(uint32_t) / 2;
-			ret = sensor_configure(sensor_info, sc132gs_linear_init_896x896_10fps_setting, setting_size);
+			setting_size = sizeof(sc132gs_linear_init_896x896_10fps_setting_master) / sizeof(uint32_t) / 2;
+			ret = sensor_configure(sensor_info, sc132gs_linear_init_896x896_10fps_setting_master, setting_size);
 			if (ret < 0) {
 				vin_err("%d : init %s fail\n", __LINE__, sensor_info->sensor_name);
 				return ret;
@@ -431,6 +433,20 @@ int sensor_init(sensor_info_t *sensor_info)
 				return ret;
 			}
 			break;
+		case SLAVE_M:	  // 6: slave
+			vin_info("sc132gs in slave mode\n");
+			setting_size = sizeof(sc132gs_linear_init_896x896_10fps_setting_slave) / sizeof(uint32_t) / 2;
+			ret = sensor_configure(sensor_info, sc132gs_linear_init_896x896_10fps_setting_slave, setting_size);
+			if (ret < 0) {
+				vin_err("%d : init %s fail\n", __LINE__, sensor_info->sensor_name);
+				return ret;
+			}
+			ret = sc132gs_linear_data_init_896x896(sensor_info);
+			if (ret < 0) {
+				vin_err("%d : linear data init %s fail\n", __LINE__, sensor_info->sensor_name);
+				return ret;
+			}
+			break;
 		default:
 			vin_err("not support mode %d\n", sensor_info->sensor_mode);
 			ret = -RET_ERROR;
@@ -440,8 +456,22 @@ int sensor_init(sensor_info_t *sensor_info)
 		switch(sensor_info->sensor_mode) {
 		case NORMAL_M:	  // 1: normal
 			vin_info("sc132gs in normal mode\n");
-			setting_size = sizeof(sc132gs_linear_init_1088x1280_30fps_setting) / sizeof(uint32_t) / 2;
-			ret = sensor_configure(sensor_info, sc132gs_linear_init_1088x1280_30fps_setting, setting_size);
+			setting_size = sizeof(sc132gs_linear_init_1088x1280_30fps_setting_master) / sizeof(uint32_t) / 2;
+			ret = sensor_configure(sensor_info, sc132gs_linear_init_1088x1280_30fps_setting_master, setting_size);
+			if (ret < 0) {
+				vin_err("%d : init %s fail\n", __LINE__, sensor_info->sensor_name);
+				return ret;
+			}
+			ret = sc132gs_linear_data_init_1088x1280(sensor_info);
+			if (ret < 0) {
+				vin_err("%d : linear data init %s fail\n", __LINE__, sensor_info->sensor_name);
+				return ret;
+			}
+			break;
+		case SLAVE_M:	  // 6: slave
+			vin_info("sc132gs in slave mode\n");
+			setting_size = sizeof(sc132gs_linear_init_1088x1280_30fps_setting_slave) / sizeof(uint32_t) / 2;
+			ret = sensor_configure(sensor_info, sc132gs_linear_init_1088x1280_30fps_setting_slave, setting_size);
 			if (ret < 0) {
 				vin_err("%d : init %s fail\n", __LINE__, sensor_info->sensor_name);
 				return ret;
@@ -457,7 +487,7 @@ int sensor_init(sensor_info_t *sensor_info)
 			ret = -RET_ERROR;
 			break;
 		}
-	} 
+	}
 	vin_info("sc132gs config success under %d mode\n\n", sensor_info->sensor_mode);
 
 	return ret;
