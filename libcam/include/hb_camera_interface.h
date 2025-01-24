@@ -511,6 +511,11 @@ extern camera_handle_t hbn_camera_get_handle(vpf_handle_t vin_fd, int32_t camera
 extern int32_t hbn_camera_init_cfg(const char *cfg_file);
 
 
+/**
+ * @description: Get both the git commit hash and version of camsys libcam.
+ * @return: A pointer to a static string containing both git commit hash and lib version.
+ */
+extern const char* hb_libcam_get_version_info(void);
 
 extern int32_t hbn_camera_switch_scence(int64_t vflow_fd, int64_t isp_vnode_fd, const char *cname);
 
