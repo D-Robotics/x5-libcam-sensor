@@ -2208,6 +2208,29 @@ int32_t camera_sensor_update_ae_info(sensor_info_t *sen_if, camera_ae_info_t *ae
 	return ret;
 }
 
+int32_t camera_sensor_otp_enable(sensor_info_t *sen_if, sensor_otp_t *otp_data)
+{
+	int32_t ret;
+	int32_t sindex;
+	char *sname;
+
+	if (sen_if == NULL) {
+		cam_err("sen_if NULL\n");
+		return -RET_ERROR;
+	}
+	camera_debug_call_cami(sen_if->port);
+	sindex = sen_if->port;
+	sname = sen_if->sensor_name;
+
+	ret = camera_sensor_dev_otp_init(sen_if, otp_data);
+	if (ret < 0)
+		cam_err("sensor%d %s enable otp error %d\n",
+			sindex, sname, ret);
+
+	camera_debug_call_camo(sen_if->port);
+	return ret;
+}
+
 /**
  * @NO{S10E02C04I}
  * @ASIL{B}

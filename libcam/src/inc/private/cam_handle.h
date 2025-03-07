@@ -204,6 +204,8 @@ struct camera_handle_ss {
 	vpf_handle_t            vin_handle;	// attach的vin
 	void		      (*event_callback)(cam_event_t* fault_info); // event回调.
 	void			*debug;		// debug用结构;
+	sensor_otp_t		otp_data;	// OTP数据
+	int32_t			otp_api_init;	// 使用api使能OTP
 };
 
 /**

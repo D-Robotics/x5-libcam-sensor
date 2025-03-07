@@ -365,6 +365,30 @@ extern int32_t hbn_camera_update_ae_info(camera_handle_t cam_fd, camera_ae_info_
 /**
  * @NO{S10E02C01I}
  * @ASIL{B}
+ * @brief enable otp to ISP
+ * @detail Need to be called before attach to vin
+ *
+ * @param[in] cam_fd: camera handle which create returned
+ *         range: [!NULL, !NULL], default: NA
+ * @param[in] otp_data: otp info struct to update
+ *         range: [!NULL, !NULL], default: NA
+ *
+ * @return 0:Success, <0:Failure
+ *
+ * @data_read None
+ * @data_updated None
+ * @compatibility HW: X5
+ * @compatibility SW: 1.0.0
+ *
+ * @callgraph
+ * @callergraph
+ * @design
+ */
+ extern int32_t hbn_camera_enable_otp(camera_handle_t cam_fd, sensor_otp_t *otp_data);
+
+/**
+ * @NO{S10E02C01I}
+ * @ASIL{B}
  * @brief get parameter info of camera sensor
  * @detail the base param from config and the internal param from eeprom hardware.
  *         only valid if sensor lib support corresponding function.
