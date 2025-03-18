@@ -153,13 +153,13 @@ int sc132gs_linear_data_init_1088x1280(sensor_info_t *sensor_info)
 	// If trigger is enabled, the configuration before trigger will still be used.
 	turning_data.sensor_data.lines_per_second = 84000;
 	// form customer, exposure time max = 10ms
-	turning_data.sensor_data.exposure_time_max = 840;
+	turning_data.sensor_data.exposure_time_max = 2560;
 
 	turning_data.sensor_data.active_width = 1088;
 	turning_data.sensor_data.active_height = 1280;
-	turning_data.sensor_data.analog_gain_max = 63;		//154
+	turning_data.sensor_data.analog_gain_max = 128;		//154
 	turning_data.sensor_data.digital_gain_max = 0;   //159
-	turning_data.sensor_data.exposure_time_min = 8;
+	turning_data.sensor_data.exposure_time_min = 1;
 	// No setting is required in linear mode
 	turning_data.sensor_data.exposure_time_long_max = 4000;
 
@@ -641,21 +641,7 @@ static int sc132gs_ae_set(uint32_t bus, uint32_t addr, uint32_t line)
 }
 
 #define SAMPLECNT 8
-static uint32_t sc132gs_line_agv(uint32_t line)
-{
-	uint32_t average, i;
-	uint64_t sum = 0;
-	static uint32_t sample_ae[SAMPLECNT];
-	static uint32_t index = 0;
-	sample_ae[index++] = line;
-	if (index == SAMPLECNT)
-		index = 0;
-	for (i = 0; i < SAMPLECNT; i++)
-		sum += sample_ae[i];
 
-	average = sum / SAMPLECNT;
-	return average;
-}
 static int sensor_aexp_line_control(hal_control_info_t *info, uint32_t mode, uint32_t *line, uint32_t line_num)
 {
 #ifdef AE_DBG
@@ -665,7 +651,7 @@ static int sensor_aexp_line_control(hal_control_info_t *info, uint32_t mode, uin
 
 
 	if (mode == NORMAL_M) {
-		val = sc132gs_line_agv(line[0]);
+		val = line[0];
 		sc132gs_ae_set(info->bus_num, info->sensor_addr, val);
 	} else if (mode == DOL2_M) {
 		//todo
