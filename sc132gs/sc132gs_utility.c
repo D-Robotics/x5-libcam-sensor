@@ -165,6 +165,7 @@ int sc132gs_linear_data_init_1088x1280(sensor_info_t *sensor_info)
 	turning_data.sensor_data.analog_gain_init = 62;
 	turning_data.sensor_data.digital_gain_init = 0;
 	turning_data.sensor_data.exposure_time_init = 840;
+	turning_data.sensor_data.delta_time = 2;
 
 	// raw10
 	sensor_data_bayer_fill(&turning_data.sensor_data, 10, (uint32_t)BAYER_START_B, (uint32_t)BAYER_PATTERN_RGGB);
