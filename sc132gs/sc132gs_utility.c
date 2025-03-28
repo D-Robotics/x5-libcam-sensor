@@ -162,6 +162,9 @@ int sc132gs_linear_data_init_1088x1280(sensor_info_t *sensor_info)
 	turning_data.sensor_data.exposure_time_min = 1;
 	// No setting is required in linear mode
 	turning_data.sensor_data.exposure_time_long_max = 4000;
+	turning_data.sensor_data.analog_gain_init = 62;
+	turning_data.sensor_data.digital_gain_init = 0;
+	turning_data.sensor_data.exposure_time_init = 840;
 
 	// raw10
 	sensor_data_bayer_fill(&turning_data.sensor_data, 10, (uint32_t)BAYER_START_B, (uint32_t)BAYER_PATTERN_RGGB);
@@ -622,8 +625,8 @@ static int sc132gs_ae_set(uint32_t bus, uint32_t addr, uint32_t line)
 	 * NOTICE: trigger mode: sline = line(from isp)
 	 * from customer, exposure time max is 10ms，sline = exposure_time_max = 420
 	 */
-	if (sline >= 840)
-		sline = 840;
+	if (sline >= 2560)
+		sline = 2560;
 
 	temp0 = (sline & 0xF000) >> 12;
 	temp1 = (sline & 0xFF0) >> 4;
