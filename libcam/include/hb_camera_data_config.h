@@ -57,6 +57,7 @@ enum sensor_mode_e {
         DOL4_M = 4,
         PWL_M = 5,
         SLAVE_M = 6,
+        MONO_M = 7,
         INVALID_MOD,
 };
 

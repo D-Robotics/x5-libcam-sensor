@@ -31,6 +31,11 @@
 #define SC035HGS_EXP_LINE (0x3e00)
 #define SC035HGS_DOL2_SHORT_EXP_LINE (0x3e04)
 
+#define HIGHLIGHT_SATURATION_HIGH_REG (0x3631)
+#define HIGHLIGHT_SATURATION_LOW_REG (0x3630)
+
+uint32_t VTS_VALUE;
+
 int sc035hgs_dol2_data_init(sensor_info_t *sensor_info);
 
 static int power_ref;
@@ -162,6 +167,26 @@ int sensor_init(sensor_info_t *sensor_info)
 			return ret;
 		}
 		break;
+	case MONO_M: // 7: MONO_M
+		vin_info("sc035hgs in mono mode\n");
+		setting_size = sizeof(sc035hgs_mono_master_640X480_30fps_setting) / sizeof(uint32_t) / 2;
+		vin_info("sensor_name %s, setting_size = %d\n", sensor_info->sensor_name, setting_size);
+		vin_info("bus_num = %d, sensor_addr = 0x%0x \n", sensor_info->bus_num, sensor_info->sensor_addr);
+		ret = vin_write_array(sensor_info->bus_num, sensor_info->sensor_addr, 2,
+							setting_size, sc035hgs_mono_master_640X480_30fps_setting);
+		if (ret < 0)
+		{
+			vin_err("%d : init %s fail\n", __LINE__, sensor_info->sensor_name);
+			return ret;
+		}
+
+		ret = sc035hgs_linear_data_init(sensor_info);
+		if (ret < 0)
+		{
+			vin_err("%d : linear data init %s fail\n", __LINE__, sensor_info->sensor_name);
+			return ret;
+		}
+		break;
 	default:
 		vin_err("not support mode %d\n", sensor_info->sensor_mode);
 		ret = -RET_ERROR;
@@ -273,6 +298,7 @@ int sc035hgs_linear_data_init(sensor_info_t *sensor_info)
 	uint16_t HTS_HIGH, HTS_LOW;
 	uint32_t HTS_VALUE;
 #endif
+	uint16_t VTS_HIGH, VTS_LOW;
 	memset(&turning_data, 0, sizeof(sensor_turning_data_t));
 
 	// common data
@@ -282,7 +308,7 @@ int sc035hgs_linear_data_init(sensor_info_t *sensor_info)
 	turning_data.reg_width = sensor_info->reg_width;
 	turning_data.mode = sensor_info->sensor_mode;
 	//SLAVE MODE is just for custom, kernel should be keep same with NORMAL_M
-	if (sensor_info->sensor_mode == SLAVE_M)
+	if (sensor_info->sensor_mode == SLAVE_M || sensor_info->sensor_mode == MONO_M)
 		turning_data.mode = NORMAL_M;  //NOTICE
 	turning_data.sensor_addr = sensor_info->sensor_addr;
 	strncpy(turning_data.sensor_name, sensor_info->sensor_name,
@@ -300,6 +326,11 @@ int sc035hgs_linear_data_init(sensor_info_t *sensor_info)
 		   __FUNCTION__, HTS_HIGH, HTS_LOW, HTS_VALUE);
 #endif
 
+	VTS_HIGH = hb_vin_i2c_read_reg16_data8(sensor_info->bus_num, sensor_info->sensor_addr, 0x320e);
+	VTS_LOW = hb_vin_i2c_read_reg16_data8(sensor_info->bus_num, sensor_info->sensor_addr, 0x320f);
+	VTS_VALUE = (VTS_HIGH << 8 | VTS_LOW);
+	printf("%s read VTS_HIGH 0x320e = 0x%x, VTS_LOW 0x320f= 0x%x, VTS = 0x%x \n",
+		__FUNCTION__, VTS_HIGH, VTS_LOW, VTS_VALUE);
 	/* from spec: one line exposure time = (1/(vts * hts * fps))*hts = 1/(vts * fps)
 	 * trigger mode, we should use previous value: 1250, not 0x3fff
 	 * */
@@ -541,7 +572,33 @@ static int sensor_aexp_gain_control(hal_control_info_t *info, uint32_t mode, uin
     uint32_t       low_dgain_default_value = 0xc;
     int            setting_size            = 0;
     uint32_t      *sensor_setting_array    = NULL;
-	
+
+	if(mode == MONO_M){
+		if (again[0] >= 127)
+			again_index = 127;
+		else
+			again_index = again[0];
+
+		if(again_index < 32 ){
+			vin_i2c_write8(info->bus_num, 16, info->sensor_addr, HIGHLIGHT_SATURATION_HIGH_REG, 0x58);
+			vin_i2c_write8(info->bus_num, 16, info->sensor_addr, HIGHLIGHT_SATURATION_LOW_REG, 0x4a);
+		}
+
+		if(again_index >= 32){
+			vin_i2c_write8(info->bus_num, 16, info->sensor_addr, HIGHLIGHT_SATURATION_HIGH_REG, 0x48);
+			vin_i2c_write8(info->bus_num, 16, info->sensor_addr, HIGHLIGHT_SATURATION_LOW_REG, 0x4c);
+		}
+		lower_again_reg_value = (sc035hgs_again_lut0[again_index] << 2) & 0x000000FF;
+		high_again_reg_value = sc035hgs_again_lut1[again_index] & 0x000000FF;
+#ifdef AE_DBG
+		printf("%s again(0x3e08/0x3e09):%x,%x\n",
+		__FUNCTION__, lower_again_reg_value, high_again_reg_value);
+#endif
+		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, AGAIN_LOW, lower_again_reg_value);
+		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, AGAIN_HIGH, high_again_reg_value);
+		return 0;
+	}
+
 	switch (mode)
     {
         case NORMAL_M:
@@ -625,7 +682,7 @@ static int sensor_aexp_line_control(hal_control_info_t *info, uint32_t mode, uin
 	const uint16_t EXP_LINE0 = 0x3e01;
 	const uint16_t EXP_LINE1 = 0x3e02;
 	char temp0 = 0, temp1 = 0;
-	if (mode == NORMAL_M || mode == SLAVE_M)
+	if (mode == NORMAL_M || mode == SLAVE_M || mode == MONO_M )
 	{
 		uint32_t sline = line[0];
 		/*
@@ -638,9 +695,17 @@ static int sensor_aexp_line_control(hal_control_info_t *info, uint32_t mode, uin
 		{
 			sline = 0;
 		}
-		else if (sline > 770)
-		{
-			sline = 770;
+		if(mode == MONO_M){
+			if (sline > VTS_VALUE -6)
+			{
+				sline = VTS_VALUE -6;
+			}
+		}
+		if(mode == NORMAL_M || mode == SLAVE_M){
+			if (sline > 770)
+			{
+				sline = 770;
+			}
 		}
 		temp0 = (sline >> 4) & 0xFF;
 		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, EXP_LINE0, temp0);
