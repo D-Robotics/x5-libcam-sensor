@@ -122,6 +122,23 @@ int sensor_init(sensor_info_t *sensor_info)
                         }
                         break;
                 case DOL2_M:
+                        vin_info("sc230ai in dol2 mode\n");
+                        vin_info("bus_num = %d, sensor_addr = 0x%0x\n", sensor_info->bus_num, sensor_info->sensor_addr);
+
+                        setting_size = sizeof(sc230ai_2lane_10bit_1920x1080_30fps_shdr_setting) / sizeof(uint32_t) / 2;
+                        ret = vin_write_array(sensor_info->bus_num, sensor_info->sensor_addr, 2,
+                                                    setting_size, sc230ai_2lane_10bit_1920x1080_30fps_shdr_setting);
+                        if (ret < 0) {
+                                vin_err("%d : init %s fail\n", __LINE__, sensor_info->sensor_name);
+                                return -HB_CAM_I2C_WRITE_FAIL;
+                        }
+                        /*mabey need to change*/
+                        ret = sc230ai_linear_data_init(sensor_info);
+                        if (ret < 0) {
+                                vin_err("%d : dol2 data init %s fail\n", __LINE__, sensor_info->sensor_name);
+                                return -HB_CAM_INIT_FAIL;
+                        }
+                        break;
                 default:
                         vin_err("%d not support mode %d\n", __LINE__, sensor_info->sensor_mode);
                         ret = -HB_CAM_INIT_FAIL;
@@ -162,6 +179,15 @@ int sensor_start(sensor_info_t *sensor_info)
                         }
                         break;
                 case DOL2_M:
+                        setting_size = sizeof(sc230ai_stream_on_setting)/sizeof(uint32_t)/2;
+                        vin_info("%s start dol2 mode\n", sensor_info->sensor_name);
+                        ret = vin_write_array(sensor_info->bus_num, sensor_info->sensor_addr, 2,
+                                        setting_size, sc230ai_stream_on_setting);
+                        if(ret < 0) {
+                                vin_err("start %s fail\n", sensor_info->sensor_name);
+                                return -HB_CAM_I2C_WRITE_FAIL;
+                        }
+                        break;
                 default:
                         vin_err("%d not support mode %d\n", __LINE__, sensor_info->sensor_mode);
                         ret = -HB_CAM_START_FAIL;
@@ -305,89 +331,152 @@ int sc230ai_linear_data_init(sensor_info_t *sensor_info)
         return ret;
 }
 
+
+/* Helper function: Set gain register */
+static void set_gain_registers(hal_control_info_t *info, uint16_t again_reg, uint16_t dgain_reg, uint16_t dfine_reg,
+        char again_val, char dgain_val, char dfine_val)
+{
+        vin_i2c_write8(info->bus_num, 16, info->sensor_addr, again_reg, again_val);
+        vin_i2c_write8(info->bus_num, 16, info->sensor_addr, dgain_reg, dgain_val);
+        vin_i2c_write8(info->bus_num, 16, info->sensor_addr, dfine_reg, dfine_val);
+}
+
+/* Helper Function: Exposure Time Register Setup */
+static void set_exposure_registers(hal_control_info_t *info, uint16_t exp_line0, uint16_t exp_line1, uint16_t exp_line2,
+           uint32_t sline)
+{
+        char temp0, temp1, temp2;
+
+        if (sline > 2022) {
+        sline = 2022;
+        }
+
+        temp0 = (sline >> 12) & 0x0F;
+        vin_i2c_write8(info->bus_num, 16, info->sensor_addr, exp_line0, temp0);
+        temp1 = (sline >> 4) & 0xFF;
+        vin_i2c_write8(info->bus_num, 16, info->sensor_addr, exp_line1, temp1);
+        temp2 = (sline & 0x0F) << 4;
+        vin_i2c_write8(info->bus_num, 16, info->sensor_addr, exp_line2, temp2);
+
+#ifdef AE_DBG
+        printf("write sline = %d, 0x%04x = 0x%x, 0x%04x = 0x%x, 0x%04x = 0x%x \n",
+        sline, exp_line0, temp0, exp_line1, temp1, exp_line2, temp2);
+#endif
+}
+
 /* input value:
  * again, dgain should be lut index
  * gain_num, linear mode: 1; dol2 mode: 2
  */
-static int sensor_aexp_gain_control(hal_control_info_t *info, uint32_t mode, uint32_t *again, uint32_t *dgain, uint32_t gain_num)
-{
-#ifdef AE_DBG
-        printf("test %s, mode = %d gain_num = %d again[0] = %d, dgain[0] = %d\n", __FUNCTION__, mode, gain_num, again[0], dgain[0]);
-#endif
-        const uint16_t AGAIN = 0x3e09;
-        const uint16_t DGAIN = 0x3e06;
-        const uint16_t DFINE_GAIN = 0x3e07;
-        char again_reg_value = 0;
-        char dgain_reg_value = 0, d_fine_gain_reg_value = 0;
-        int gain_index = 0;
+ static int sensor_aexp_gain_control(hal_control_info_t *info, uint32_t mode, uint32_t *again, uint32_t *dgain, uint32_t gain_num)
+ {
+ #ifdef AE_DBG
+     printf("test %s, mode = %d gain_num = %d again[0] = %d, dgain[0] = %d\n",
+            __FUNCTION__, mode, gain_num, again[0], dgain[0]);
+ #endif
 
-        if (mode == NORMAL_M || mode == SLAVE_M) {
-                if (again[0] >= sizeof(sc230ai_gain_lut)/sizeof(uint32_t))
-                        gain_index = sizeof(sc230ai_gain_lut)/sizeof(uint32_t) - 1;
-                else
-                        gain_index = again[0];
+     const uint16_t AGAIN = 0x3e09;
+     const uint16_t DGAIN = 0x3e06;
+     const uint16_t DFINE_GAIN = 0x3e07;
+     char again_reg_value = 0;
+     char dgain_reg_value = 0, d_fine_gain_reg_value = 0;
+     int gain_index = 0;
 
-                again_reg_value = (sc230ai_gain_lut[gain_index] >> 16) & 0x000000FF;
-                dgain_reg_value = (sc230ai_gain_lut[gain_index] >> 8) & 0x000000FF;
-                d_fine_gain_reg_value = sc230ai_gain_lut[gain_index] & 0x000000FF;
-#ifdef AE_DBG
-                printf("%s, gain_index: %d, 0x3e09 = 0x%x dgain: 0x3e06 = 0x%x dig fine gain: 0x3e07 = 0x%x\n",
-                                __FUNCTION__, gain_index, again_reg_value, dgain_reg_value, d_fine_gain_reg_value);
-        #endif
-                vin_i2c_write8(info->bus_num, 16, info->sensor_addr, AGAIN, again_reg_value);
-                vin_i2c_write8(info->bus_num, 16, info->sensor_addr, DGAIN, dgain_reg_value);
-                vin_i2c_write8(info->bus_num, 16, info->sensor_addr, DFINE_GAIN, d_fine_gain_reg_value);
-        } else	{
-                vin_err(" unsupport mode %d\n", mode);
-        }
+     // Calculate Gain Index
+     if (again[0] >= sizeof(sc230ai_gain_lut)/sizeof(uint32_t))
+         gain_index = sizeof(sc230ai_gain_lut)/sizeof(uint32_t) - 1;
+     else
+         gain_index = again[0];
 
-    return 0;
+     // Calculate Gain Value
+     again_reg_value = (sc230ai_gain_lut[gain_index] >> 16) & 0x000000FF;
+     dgain_reg_value = (sc230ai_gain_lut[gain_index] >> 8) & 0x000000FF;
+     d_fine_gain_reg_value = sc230ai_gain_lut[gain_index] & 0x000000FF;
+
+ #ifdef AE_DBG
+     printf("%s, gain_index: %d, 0x3e09 = 0x%x dgain: 0x3e06 = 0x%x dig fine gain: 0x3e07 = 0x%x\n",
+            __FUNCTION__, gain_index, again_reg_value, dgain_reg_value, d_fine_gain_reg_value);
+ #endif
+
+     // Configure registers based on the mode.
+     if (mode == NORMAL_M || mode == SLAVE_M) {
+         set_gain_registers(info, AGAIN, DGAIN, DFINE_GAIN,
+                           again_reg_value, dgain_reg_value, d_fine_gain_reg_value);
+     } else if(mode == DOL2_M) {
+         const uint16_t AGAIN_HDR_SHORT = 0x3e13;
+         const uint16_t DGAIN_HDR_SHORT = 0x3e10;
+         const uint16_t DFINE_GAIN_HDR_SHORT = 0x3e11;
+
+ #ifdef AE_DBG
+         printf("%s, gain_index: %d, 0x3e13 = 0x%x dgain: 0x3e10 = 0x%x dig fine gain: 0x3e11 = 0x%x\n",
+                __FUNCTION__, gain_index, again_reg_value, dgain_reg_value, d_fine_gain_reg_value);
+ #endif
+
+         // Set Long Exposure Gain,
+         set_gain_registers(info, AGAIN, DGAIN, DFINE_GAIN,
+                           again_reg_value, dgain_reg_value, d_fine_gain_reg_value);
+
+         // Set Short Exposure Gain
+         set_gain_registers(info, AGAIN_HDR_SHORT, DGAIN_HDR_SHORT, DFINE_GAIN_HDR_SHORT,
+                           again_reg_value, dgain_reg_value, d_fine_gain_reg_value);
+     } else {
+         vin_err(" unsupport mode %d\n", mode);
+     }
+
+     return 0;
 }
 
 /* input value:
  * line: exposure time value
  * line_num: linear mode: 1; dol2 mode: 2
  * */
-static int sensor_aexp_line_control(hal_control_info_t *info, uint32_t mode, uint32_t *line, uint32_t line_num)
-{
-#ifdef AE_DBG
-        printf("line mode %d, --line %d , line_num:%d \n", mode, line[0], line_num);
-#endif
-        const uint16_t EXP_LINE0 = 0x3e00;
-        const uint16_t EXP_LINE1 = 0x3e01;
-        const uint16_t EXP_LINE2 = 0x3e02;
-        char temp0 = 0, temp1 = 0, temp2 = 0;
+ static int sensor_aexp_line_control(hal_control_info_t *info, uint32_t mode, uint32_t *line, uint32_t line_num)
+ {
+ #ifdef AE_DBG
+     printf("line mode %d, --line %d , line_num:%d \n", mode, line[0], line_num);
+ #endif
 
-        if (mode == NORMAL_M || mode == SLAVE_M) {
-                uint32_t sline = 2 * line[0];
-                /*
-                        * NOTICE: sensor exposure half line, so sline = 2 * line(from isp)
-                        * exposure line max, from customer:
-                        * exposure_time_max = 10ms, line = 337, result = 337 * 2 = 674
-                        * form spec:
-                        * exposure_time_max = 2 * VTS - 8, 10fps, result = 11250 * 2 - 8
-                        * so, we should limit sline = 674
-                        */
-                if ( sline > 2022) {
-                        sline = 2022;
-                }
+     const uint16_t EXP_LINE0 = 0x3e00;
+     const uint16_t EXP_LINE1 = 0x3e01;
+     const uint16_t EXP_LINE2 = 0x3e02;
 
-                temp0 = (sline >> 12) & 0x0F;
-                vin_i2c_write8(info->bus_num, 16, info->sensor_addr, EXP_LINE0, temp0);
-                temp1 = (sline >> 4) & 0xFF;
-                vin_i2c_write8(info->bus_num, 16, info->sensor_addr, EXP_LINE1, temp1);
-                temp2 = (sline & 0x0F) << 4;
-                vin_i2c_write8(info->bus_num, 16, info->sensor_addr, EXP_LINE2, temp2);
-#ifdef AE_DBG
-        printf("write sline = %d, 0x3e00 = 0x%x, 0x3e01 = 0x%x, 0x3e02 = 0x%x \n",
-                        sline, temp0, temp1, temp2);
-#endif
+     if (mode == NORMAL_M || mode == SLAVE_M) {
+         /*
+         * NOTICE: sensor exposure half line, so sline = 2 * line(from isp)
+         * exposure line max, from customer:
+         * exposure_time_max = 10ms, line = 337, result = 337 * 2 = 674
+         * form spec:
+         * exposure_time_max = 2 * VTS - 8, 10fps, result = 11250 * 2 - 8
+         * so, we should limit sline = 674
+         */
+         uint32_t sline = 2 * line[0];
+         set_exposure_registers(info, EXP_LINE0, EXP_LINE1, EXP_LINE2, sline);
+     } else if(mode == DOL2_M) {
+         const uint16_t EXP_HDR_SHORT_LINE0 = 0x3e22;
+         const uint16_t EXP_HDR_SHORT_LINE1 = 0x3e04;
+         const uint16_t EXP_HDR_SHORT_LINE2 = 0x3e05;
 
-        } else {
-                vin_err(" unsupport mode %d\n", mode);
-        }
+         /*
+         * NOTICE: sensor exposure half line, so sline = 2 * line(from isp)
+         * exposure line max, from customer:
+         * exposure_time_max = 10ms, line = 337, result = 337 * 2 = 674
+         * form spec:
+         * exposure_time_max = 2 * VTS - 8, 10fps, result = 11250 * 2 - 8
+         * so, we should limit sline = 674
+         */
+         uint32_t sline = 2 * line[0];
+         uint32_t sline_short = 2 * line[1];
 
-        return 0;
+         // 设置长曝光时间
+         set_exposure_registers(info, EXP_LINE0, EXP_LINE1, EXP_LINE2, sline);
+
+         // 设置短曝光时间
+         set_exposure_registers(info, EXP_HDR_SHORT_LINE0, EXP_HDR_SHORT_LINE1, EXP_HDR_SHORT_LINE2, sline_short);
+     } else {
+         vin_err(" unsupport mode %d\n", mode);
+     }
+
+     return 0;
 }
 
 static int sensor_userspace_control(uint32_t port, uint32_t *enable)
@@ -412,6 +501,13 @@ static int32_t sensor_update_fps_notify_driver(sensor_info_t *sensor_info)
                         }
                         break;
                 case (uint32_t)DOL2_M:
+                        /*mabey change*/
+                        ret = sc230ai_linear_data_init(sensor_info);
+                        if (ret < 0) {
+                                vin_err("update fps sc230ai_linear_data_init fail\n");
+                                return ret;
+                        }
+                        break;
                 default:
                         vin_err("update fps not support %d mode \n", sensor_info->sensor_mode);
                         break;
