@@ -148,16 +148,13 @@ int sensor_init(sensor_info_t *sensor_info)
 
         // Default 30fps
         // Switch frame rate based on application configuration
-        if (sensor_info->fps == 10) {
-                //switch fps should be setted by user program, API: <hbn_camera_change_fps> !
-                usleep(100 * 1000);  //100ms
-                ret = sensor_dynamic_switch_fps(sensor_info, 10);
-                if (ret < 0) {
-                        vin_err("sc230ai dynamic switch fps fail, ret = %d \n", ret);
-                        //ret = RET_OK;
-                }
-        }
-
+        //switch fps should be setted by user program, API: <hbn_camera_change_fps> !
+	usleep(100 * 1000);  //100ms
+	ret = sensor_dynamic_switch_fps(sensor_info, sensor_info->fps);
+	if (ret < 0) {
+		vin_err("sc230ai dynamic switch fps fail, ret = %d \n", ret);
+		ret = HB_CAM_DYNAMIC_SWITCH_FPS_FAIL;
+	}
         return ret;
 }
 
