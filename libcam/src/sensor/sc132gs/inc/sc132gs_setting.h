@@ -12,7 +12,7 @@ extern "C" {
 #define TRIGGER
 #define WIDTH 1088
 
-static uint32_t sc132gs_linear_init_1088x1280_30fps_setting_master[] = {
+static uint32_t sc132gs_linear_init_1088x1280_60fps_setting_master[] = {
 	0x0103,0x01,
 	0x0100,0x00,
 	0x36e9,0x80,

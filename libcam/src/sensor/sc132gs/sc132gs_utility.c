@@ -460,8 +460,8 @@ int sensor_init(sensor_info_t *sensor_info)
 		switch(sensor_info->sensor_mode) {
 		case NORMAL_M:	  // 1: normal
 			vin_info("sc132gs in normal mode\n");
-			setting_size = sizeof(sc132gs_linear_init_1088x1280_30fps_setting_master) / sizeof(uint32_t) / 2;
-			ret = sensor_configure(sensor_info, sc132gs_linear_init_1088x1280_30fps_setting_master, setting_size);
+			setting_size = sizeof(sc132gs_linear_init_1088x1280_60fps_setting_master) / sizeof(uint32_t) / 2;
+			ret = sensor_configure(sensor_info, sc132gs_linear_init_1088x1280_60fps_setting_master, setting_size);
 			if (ret < 0) {
 				vin_err("%d : init %s fail\n", __LINE__, sensor_info->sensor_name);
 				return ret;
