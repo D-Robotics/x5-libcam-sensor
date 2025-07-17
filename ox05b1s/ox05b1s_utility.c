@@ -36,7 +36,7 @@
 #define OX05B1S_PLL2_SA1_CLK  48  // 48MHz
 #define OX05B1S_LINE_ROW_PERIODS ((float)OX05B1S_LINE_LENTH / OX05B1S_PLL2_SA1_CLK)   // 15.67us .Forced conversion to floating point retains data precision
 #define OX05B1S_MAX_EXPOSURE_TIME ((int)(OX05B1S_FRAME_LENTH - 30 * OX05B1S_LINE_ROW_PERIODS))  // 2128 - 30 * 15.67 = 1658
-#define OX05B1S_MIN_EXPOSURE_TIME ((int)(6 * OX05B1S_LINE_ROW_PERIODS))  // 6 * 15.67 = 94
+#define OX05B1S_MIN_EXPOSURE_TIME 6  // According to actual testing, the value obtained is 6 lines.
 #define OX05B1S_LINES_PER_SECOND (OX05B1S_FRAME_LENTH * OX05B1S_FPS)  // 2128 * 30 = 63840
 #define SENSOR0_I2C_BUS 4
 #define SENSOR1_I2C_BUS 2
