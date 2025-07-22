@@ -30,6 +30,16 @@
 #define OV50H40_VTS_HI  0x380e
 #define OV50H40_VTS_LO  0x380f
 
+#define DW9800_VCM_ADDR 0x0c //ov50h VCM address
+
+int sensor_af_init(sensor_info_t *info)
+{
+	camera_i2c_write_reg8_data8(info->bus_num, DW9800_VCM_ADDR, 0x02, 0x02);
+	camera_i2c_write_reg8_data8(info->bus_num, DW9800_VCM_ADDR, 0x06, 0x40);
+	camera_i2c_write_reg8_data8(info->bus_num, DW9800_VCM_ADDR, 0x07, 0x79);
+	return 0;
+}
+
 static int ov50h40_linear_data_init(sensor_info_t *sensor_info);
 int sensor_poweron(sensor_info_t *sensor_info)
 {
@@ -97,7 +107,9 @@ int sensor_init(sensor_info_t *sensor_info)
 		return ret;
 	}
 
-return ret;
+	sensor_af_init(sensor_info);
+
+	return ret;
 }
 
 // start stream
@@ -273,6 +285,37 @@ static int ov50h40_linear_data_init(sensor_info_t *sensor_info)
 	return ret;
 }
 
+
+static int sensor_af_control(hal_control_info_t *info, uint32_t mode, uint32_t pos)
+{
+#ifdef AE_DBG
+	printf("test %s, mode = %d pos = %d\n", __FUNCTION__, mode, pos);
+#endif
+	//VCM CONTROL REG
+	const uint16_t VCM_MSB = 0x03; //[9:8]
+	const uint16_t VCM_LSB = 0x04; //[7:0]
+
+	char temp0 = 0, temp1 = 0;
+	uint32_t spos =  pos;
+	if ( spos > 1023) {
+		spos = 1023;
+	}
+
+	if ( spos < 0) {
+		spos = 0;
+	}
+
+	temp0 = (spos >> 8) & 0x3;
+	vin_i2c_write8(info->bus_num, 8, DW9800_VCM_ADDR, VCM_MSB, temp0);
+	temp1 = (spos) & 0xff;
+	vin_i2c_write8(info->bus_num, 8, DW9800_VCM_ADDR, VCM_LSB, temp1);
+#ifdef AE_DBG
+		printf("write spos = %d, 0x03 = 0x%x, 0x04 = 0x%x\n",spos, temp0, temp1);
+#endif
+
+	return 0;
+}
+
 static int sensor_aexp_gain_control(hal_control_info_t *info, uint32_t mode, uint32_t *again, uint32_t *dgain, uint32_t gain_num)
 {
 #ifdef AE_DBG
@@ -371,7 +414,7 @@ static int sensor_aexp_line_control(hal_control_info_t *info, uint32_t mode, uin
 static int sensor_userspace_control(uint32_t port, uint32_t *enable)
 {
 	vin_info("enable userspace gain control and line control\n");
-	*enable = HAL_GAIN_CONTROL| HAL_LINE_CONTROL;
+	*enable = HAL_GAIN_CONTROL| HAL_LINE_CONTROL | HAL_AF_CONTROL;
 	return 0;
 }
 
@@ -390,6 +433,7 @@ sensor_module_t ov50h40 = {
 	.power_on = sensor_poweron,
 	.power_off = sensor_poweroff,
 	.aexp_line_control = sensor_aexp_line_control,
+	.af_control = sensor_af_control,
 	.aexp_gain_control = sensor_aexp_gain_control,
 	.userspace_control = sensor_userspace_control,
 };
