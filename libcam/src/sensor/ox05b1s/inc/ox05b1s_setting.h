@@ -12,7 +12,7 @@ extern "C" {
 #define TRIGGER
 #define WIDTH 1088
 
-static uint32_t ox05b1s_linear_init_2592x1944_30fps_setting_master_2lane[] = {
+static uint32_t ox05b1s_linear_init_2592x1944_10fps_setting_master_2lane[] = {
         0x0107, 0x01,
         DELAY_FLAG, 0x06,  // delay 6ms
         0x3020, 0x01,
@@ -334,11 +334,11 @@ static uint32_t ox05b1s_linear_init_2592x1944_30fps_setting_master_2lane[] = {
         0x380c, 0x01,
         0x380d, 0x78,
         // 30fps
-        0x380e, 0x08,
-        0x380f, 0x50,
+        // 0x380e, 0x08,
+        // 0x380f, 0x50,
         // 10fps
-        // 0x380e, 0x18,
-        // 0x380f, 0xf0,
+        0x380e, 0x18,
+        0x380f, 0xf0,
 
         0x3810, 0x00,
         0x3811, 0x05,
@@ -1149,7 +1149,7 @@ static uint32_t ox05b1s_linear_init_2592x1944_30fps_setting_master_2lane[] = {
         0x36d0, 0x03,
 };
 
-static uint32_t ox05b1s_linear_init_2592x1944_30fps_setting_slave_2lane[] = {
+static uint32_t ox05b1s_linear_init_2592x1944_10fps_setting_slave_2lane[] = {
         0x0107, 0x01,
         DELAY_FLAG, 0x06,  // delay 6ms
         0x3020, 0x01,
@@ -1471,11 +1471,11 @@ static uint32_t ox05b1s_linear_init_2592x1944_30fps_setting_slave_2lane[] = {
         0x380c, 0x01,
         0x380d, 0x78,
         // 30fps
-        0x380e, 0x08,
-        0x380f, 0x50,
+        // 0x380e, 0x08,
+        // 0x380f, 0x50,
         // 10fps
-        // 0x380e, 0x18,
-        // 0x380f, 0xf0,
+        0x380e, 0x18,
+        0x380f, 0xf0,
 
         0x3810, 0x00,
         0x3811, 0x05,

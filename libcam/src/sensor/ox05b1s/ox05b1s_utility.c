@@ -28,7 +28,7 @@
 // AEC (exposure time control)
 #define OX05B1S_EXP_LINE0 0x3501  // 0x3501[7:0] = AEC[15:8]
 #define OX05B1S_EXP_LINE1 0x3502  // 0x3502[7:0] = AEC[7:0]
-#define OX05B1S_FPS 30
+#define OX05B1S_FPS 10
 #define OX05B1S_IMAGE_WIDTH 2592
 #define OX05B1S_IMAGE_HEIGHT 1944
 #define OX05B1S_FRAME_LENTH 2128  // VTS 
@@ -240,8 +240,8 @@ int sensor_init(sensor_info_t *sensor_info)
 			vin_info("ox05b1s is in normal mode.\n");
 			#if 1  // 2 lane
 			vin_info("ox05b1s is in 2 lane config.\n");
-			setting_size = sizeof(ox05b1s_linear_init_2592x1944_30fps_setting_master_2lane) / sizeof(uint32_t) / 2;
-			ret = sensor_configure(sensor_info, ox05b1s_linear_init_2592x1944_30fps_setting_master_2lane, setting_size);
+			setting_size = sizeof(ox05b1s_linear_init_2592x1944_10fps_setting_master_2lane) / sizeof(uint32_t) / 2;
+			ret = sensor_configure(sensor_info, ox05b1s_linear_init_2592x1944_10fps_setting_master_2lane, setting_size);
 			#else  // 4 lane
 			vin_info("ox05b1s is in 4 lane config\n");
 			setting_size = sizeof(ox05b1s_linear_init_2592x1944_30fps_setting_master_4lane) / sizeof(uint32_t) / 2;
@@ -263,8 +263,8 @@ int sensor_init(sensor_info_t *sensor_info)
 			vin_info("ox05b1s is in slave mode.\n");
 			#if 1 // 2 lane
 			vin_info("ox05b1s is in 2 lane config\n");
-			setting_size = sizeof(ox05b1s_linear_init_2592x1944_30fps_setting_slave_2lane) / sizeof(uint32_t) / 2;
-			ret = sensor_configure(sensor_info, ox05b1s_linear_init_2592x1944_30fps_setting_slave_2lane, setting_size);
+			setting_size = sizeof(ox05b1s_linear_init_2592x1944_10fps_setting_slave_2lane) / sizeof(uint32_t) / 2;
+			ret = sensor_configure(sensor_info, ox05b1s_linear_init_2592x1944_10fps_setting_slave_2lane, setting_size);
 			#else  // 4 lane
 			vin_info("ox05b1s is in 4 lane config\n");
 			setting_size = sizeof(ox05b1s_linear_init_2592x1944_30fps_setting_slave_4lane) / sizeof(uint32_t) / 2;
