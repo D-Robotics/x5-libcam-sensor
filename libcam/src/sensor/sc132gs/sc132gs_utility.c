@@ -32,6 +32,9 @@
 #define SC132GS_EXP_LINE		(0x3e00)
 #define SC132GS_DOL2_SHORT_EXP_LINE		(0x3e04)
 
+/*store sensor_info extra_mode*/
+uint32_t extra_mode = 0;
+
 // turning data init
 int sc132gs_linear_data_init_896x896(sensor_info_t *sensor_info)
 {
@@ -341,6 +344,134 @@ int sc132gs_dol2_data_init_896x896(sensor_info_t *sensor_info)
 	return ret;
 }
 
+int sc132gs_dol2_data_init_1088x1280(sensor_info_t *sensor_info)
+{
+	int ret = RET_OK;
+	uint32_t  open_cnt = 0;
+	sensor_turning_data_t turning_data;
+	uint32_t *stream_on = turning_data.stream_ctrl.stream_on;
+	uint32_t *stream_off = turning_data.stream_ctrl.stream_off;
+
+	memset(&turning_data, 0, sizeof(sensor_turning_data_t));
+
+	// common data
+	turning_data.bus_num = sensor_info->bus_num;
+	turning_data.bus_type = sensor_info->bus_type;
+	turning_data.port = sensor_info->port;
+	turning_data.reg_width = sensor_info->reg_width;
+	turning_data.mode = sensor_info->sensor_mode;
+	turning_data.sensor_addr = sensor_info->sensor_addr;
+	strncpy(turning_data.sensor_name, sensor_info->sensor_name,
+		sizeof(turning_data.sensor_name));
+
+	// turning sensor_data
+	turning_data.sensor_data.turning_type = 6;
+	turning_data.sensor_data.lines_per_second = 135000;
+	turning_data.sensor_data.exposure_time_max = 968;
+
+	turning_data.sensor_data.active_width = 1088;
+	turning_data.sensor_data.active_height = 1280;
+	// turning_data.sensor_data.gain_max = 128 * 8192;
+	turning_data.sensor_data.analog_gain_max = 205*8192;
+	turning_data.sensor_data.digital_gain_max = 159*8192;
+	turning_data.sensor_data.exposure_time_min = 1;
+	turning_data.sensor_data.exposure_time_long_max = 2176;
+	// turning_data.sensor_data.conversion = 1;
+
+	// turning normal
+	// // // short frame
+	// turning_data.dol2.s_line = SC1330T_DOL2_SHORT_EXP_LINE;
+	// turning_data.dol2.s_line_length = 2;
+	// // long frame
+	// turning_data.dol2.m_line = S1330T_EXP_LINE;
+	// turning_data.dol2.m_line_length = 2;
+
+	if(sensor_info->extra_mode == 1)
+	{
+		printf("%s sensor_info->extra_mode  == 1 \n" , __func__);
+		turning_data.sensor_data.lines_per_second = 45000;
+		turning_data.sensor_data.lines_per_second *= 4;
+		turning_data.sensor_data.exposure_time_max *= 4;
+		turning_data.sensor_data.exposure_time_min *= 1;
+		turning_data.sensor_data.exposure_time_long_max *= 4;
+		turning_data.sensor_data.exposure_time_init *= 4;
+		turning_data.sensor_data.delta_time *= 4;
+	}
+	// raw10
+	sensor_data_bayer_fill(&turning_data.sensor_data, 10, (uint32_t)BAYER_START_B, (uint32_t)BAYER_PATTERN_RGGB);
+	sensor_data_bits_fill(&turning_data.sensor_data, 12);
+
+
+	turning_data.dol2.line_p[0].ratio = 1 << 8;
+	turning_data.dol2.line_p[0].offset = 0;
+	turning_data.dol2.line_p[0].max = 66;
+	turning_data.dol2.line_p[1].ratio = 1 << 8;
+	turning_data.dol2.line_p[1].offset = 0;
+	turning_data.dol2.line_p[1].max = 2176;
+
+#if 0
+	turning_data.dol2.again_control_num = 1;
+	turning_data.dol2.again_control[0] = SC132GS_PROGRAM_GAIN;
+	turning_data.dol2.again_control_length[0] = 2;
+	turning_data.dol2.dgain_control_num = 1;
+	turning_data.dol2.dgain_control_length[0] = 2;
+	turning_data.dol2.dgain_control[0] = SC132GS_DIGITAL_GAIN;
+#endif
+
+	turning_data.stream_ctrl.data_length = 1;
+	if(sizeof(turning_data.stream_ctrl.stream_on) >= sizeof(sc132gs_stream_on_setting)) {
+		memcpy(stream_on, sc132gs_stream_on_setting, sizeof(sc132gs_stream_on_setting));
+	} else {
+		vin_err("Number of registers on stream over 10\n");
+		return -RET_ERROR;
+	}
+	if(sizeof(turning_data.stream_ctrl.stream_on) >= sizeof(sc132gs_stream_off_setting)) {
+		memcpy(stream_off, sc132gs_stream_off_setting, sizeof(sc132gs_stream_off_setting));
+	} else {
+		vin_err("Number of registers on stream over 10\n");
+		return -RET_ERROR;
+	}
+
+	turning_data.dol2.again_lut = malloc(256*sizeof(uint32_t));
+	if (turning_data.dol2.again_lut != NULL) {
+		memset(turning_data.dol2.again_lut, 0xff, 256*sizeof(uint32_t));
+		memcpy(turning_data.dol2.again_lut, sc132gs_gain_lut,
+			sizeof(sc132gs_gain_lut));
+		for (open_cnt =0; open_cnt <
+			sizeof(sc132gs_gain_lut)/sizeof(uint32_t); open_cnt++) {
+				// DOFFSET(&turning_data.dol2.again_lut[open_cnt], 2);
+		}
+	}
+
+	turning_data.dol2.dgain_lut = malloc(256*sizeof(uint32_t));
+	if (turning_data.dol2.dgain_lut != NULL) {
+		memset(turning_data.dol2.dgain_lut, 0xff, 256*sizeof(uint32_t));
+		memcpy(turning_data.dol2.dgain_lut, sc132gs_dgain_lut,
+			sizeof(sc132gs_dgain_lut));
+		for (open_cnt =0; open_cnt <
+			sizeof(sc132gs_dgain_lut)/sizeof(uint32_t); open_cnt++) {
+				// DOFFSET(&turning_data.dol2.dgain_lut[open_cnt], 2);
+		}
+	}
+
+	ret = ioctl(sensor_info->sen_devfd, SENSOR_TURNING_PARAM, &turning_data);
+	if (turning_data.dol2.again_lut) {
+		free(turning_data.dol2.again_lut);
+		turning_data.dol2.again_lut = NULL;
+	}
+	if (turning_data.dol2.dgain_lut) {
+		free(turning_data.dol2.dgain_lut);
+		turning_data.dol2.dgain_lut = NULL;
+	}
+	if (ret < 0) {
+		vin_err("sensor_%d ioctl fail %d\n", ret);
+		return -RET_ERROR;
+	}
+
+	return ret;
+}
+
+
 int sensor_poweroff(sensor_info_t *sensor_info)
 {
 	int gpio, ret = RET_OK;
@@ -399,6 +530,8 @@ int sensor_init(sensor_info_t *sensor_info)
 {
 	int ret = RET_OK;
 	int setting_size = 0;
+
+	extra_mode = sensor_info->extra_mode;
 
 	ret = sensor_poweron(sensor_info);
 	if (ret < 0) {
@@ -459,19 +592,39 @@ int sensor_init(sensor_info_t *sensor_info)
 	}else if (sensor_info->width == 1088 && sensor_info->height == 1280) {
 		switch(sensor_info->sensor_mode) {
 		case NORMAL_M:	  // 1: normal
-			vin_info("sc132gs in normal mode\n");
-			setting_size = sizeof(sc132gs_linear_init_1088x1280_60fps_setting_master) / sizeof(uint32_t) / 2;
-			ret = sensor_configure(sensor_info, sc132gs_linear_init_1088x1280_60fps_setting_master, setting_size);
-			if (ret < 0) {
-				vin_err("%d : init %s fail\n", __LINE__, sensor_info->sensor_name);
-				return ret;
+			vin_info("sc132gs in normal mode , extra_mode = %d\n",sensor_info->extra_mode);
+			if(sensor_info->extra_mode == 1)
+			{
+				vin_info("sc132gs in extra_mode mode\n");
+				setting_size = sizeof(sc132gs_hdr_init_1088x1280_30fps_setting) / sizeof(uint32_t) / 2;
+				ret = sensor_configure(sensor_info, sc132gs_hdr_init_1088x1280_30fps_setting, setting_size);
+				if (ret < 0) {
+					vin_err("%d : init %s fail\n", __LINE__, sensor_info->sensor_name);
+					return ret;
+				}
+				ret = sc132gs_dol2_data_init_1088x1280(sensor_info);
+				if (ret < 0) {
+					vin_err("%d : extra_mode dol2 data init %s fail\n", __LINE__, sensor_info->sensor_name);
+					return ret;
+				}
+				break;
 			}
-			ret = sc132gs_linear_data_init_1088x1280(sensor_info);
-			if (ret < 0) {
-				vin_err("%d : linear data init %s fail\n", __LINE__, sensor_info->sensor_name);
-				return ret;
+			else
+			{
+				vin_info("sc132gs in normal mode\n");
+				setting_size = sizeof(sc132gs_linear_init_1088x1280_60fps_setting_master) / sizeof(uint32_t) / 2;
+				ret = sensor_configure(sensor_info, sc132gs_linear_init_1088x1280_60fps_setting_master, setting_size);
+				if (ret < 0) {
+					vin_err("%d : init %s fail\n", __LINE__, sensor_info->sensor_name);
+					return ret;
+				}
+				ret = sc132gs_linear_data_init_1088x1280(sensor_info);
+				if (ret < 0) {
+					vin_err("%d : linear data init %s fail\n", __LINE__, sensor_info->sensor_name);
+					return ret;
+				}
+				break;
 			}
-			break;
 		case SLAVE_M:	  // 6: slave
 			vin_info("sc132gs in slave mode\n");
 			setting_size = sizeof(sc132gs_linear_init_1088x1280_30fps_setting_slave) / sizeof(uint32_t) / 2;
@@ -644,6 +797,36 @@ static int sc132gs_ae_set(uint32_t bus, uint32_t addr, uint32_t line)
 	return 0;
 }
 
+// 实现一个 1/16 行为曝光单位的方法
+
+static int sc132gs_ae_set_extra_mode(uint32_t bus, uint32_t addr, uint32_t line)
+{
+	const uint16_t HDR_EXP_LINE0 = 0x3e31;
+	const uint16_t HDR_EXP_LINE1 = 0x3e32;
+	char temp0 = 0, temp1 = 0;
+
+	uint32_t sline = line * 4;
+
+	/*
+	 * NOTICE: trigger mode: sline = line(from isp)
+	 * from customer, exposure time max is 10ms，sline = exposure_time_max = 420
+	 */
+	// if (sline >= 2560)
+	// 	sline = 2560;
+
+	// HDR exposure only need 2 register to control
+	temp0 = (sline & 0x0000FF00) >> 8;
+	temp1 = (sline & 0x000000FF);
+	vin_i2c_write8(bus, 16, addr, HDR_EXP_LINE0, temp0);
+	vin_i2c_write8(bus, 16, addr, HDR_EXP_LINE1, temp1);
+
+#ifdef AE_DBG
+	printf("%s sline = %d, 0x3e31 = %x, 0x3e32 = %x \n",
+		__FUNCTION__, sline, temp0, temp1);
+#endif
+
+	return 0;
+}
 #define SAMPLECNT 8
 
 static int sensor_aexp_line_control(hal_control_info_t *info, uint32_t mode, uint32_t *line, uint32_t line_num)
@@ -656,7 +839,10 @@ static int sensor_aexp_line_control(hal_control_info_t *info, uint32_t mode, uin
 
 	if (mode == NORMAL_M) {
 		val = line[0];
-		sc132gs_ae_set(info->bus_num, info->sensor_addr, val);
+		if(extra_mode == 1)
+			sc132gs_ae_set_extra_mode(info->bus_num, info->sensor_addr, val);
+		else
+			sc132gs_ae_set(info->bus_num, info->sensor_addr, val);
 	} else if (mode == DOL2_M) {
 		//todo
 	} else {
