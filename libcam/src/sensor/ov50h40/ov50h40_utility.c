@@ -23,8 +23,8 @@
 
 #define OV50H40_AGAIN_HIGH_BYTE  0x3508
 #define OV50H40_AGAIN_LOW_BYTE  0x3509
-#define OV50H40_EXP_HIGH_BYTE  0x3501
-#define OV50H40_EXP_LOW_BYTE  0x3502
+#define OV50H40_EXP_HIGH_BYTE  0x3501 //[15:8]
+#define OV50H40_EXP_LOW_BYTE  0x3502  //[7:0]
 #define OV50H40_HTS_HI  0x380c
 #define OV50H40_HTS_LO  0x380d
 #define OV50H40_VTS_HI  0x380e
@@ -41,6 +41,8 @@ int sensor_af_init(sensor_info_t *info)
 }
 
 static int ov50h40_linear_data_init(sensor_info_t *sensor_info);
+static int32_t sensor_dynamic_switch_fps(sensor_info_t *sensor_info, uint32_t fps);
+static int32_t sensor_update_fps_notify_driver(sensor_info_t *sensor_info);
 int sensor_poweron(sensor_info_t *sensor_info)
 {
 	int gpio, ret = RET_OK;
@@ -105,6 +107,16 @@ int sensor_init(sensor_info_t *sensor_info)
 		pr_err("%d : turning data init %s fail\n",
 							__LINE__, sensor_info->sensor_name);
 		return ret;
+	}
+
+	// Default 30fps
+	// Switch frame rate based on application configuration
+	//switch fps should be setted by user program, API: <hbn_camera_change_fps> !
+	usleep(100 * 1000);  //100ms
+	ret = sensor_dynamic_switch_fps(sensor_info, sensor_info->fps);
+	if (ret < 0) {
+		vin_err("ov50h40 dynamic switch fps fail, ret = %d \n", ret);
+		ret = HB_CAM_DYNAMIC_SWITCH_FPS_FAIL;
 	}
 
 	sensor_af_init(sensor_info);
@@ -386,11 +398,26 @@ static int sensor_aexp_line_control(hal_control_info_t *info, uint32_t mode, uin
 	const uint16_t EXP_L_LINE2 = 0x3502; //[0:7]
 
 	char temp0 = 0, temp1 = 0, temp2 = 0;
+	char dynamic_vts_h = 0, dynamic_vts_l = 0;
 	if (mode == NORMAL_M) {
 		uint32_t sline =  line[0];
-		if ( sline > 1048) {
-			sline = 1048;
+
+		// Support dynamic FPS based on ISP exposure time line
+		uint32_t dynamic_vts = sline + 36; // from sensor FAE :dynamic_vts = sline + 36
+		if(dynamic_vts <= 1084){
+			dynamic_vts = 1084;
+		}else{
+			//NOTICE: fps = lines_per_second / vts
+			uint32_t fps = 32540 / dynamic_vts;
+#ifdef AE_DBG
+			printf("%s set fps = %d, vts = 0x%x \n", __FUNCTION__, fps, dynamic_vts);
+#endif
 		}
+
+		dynamic_vts_h = (dynamic_vts >> 8) & 0xFF;
+		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, OV50H40_VTS_HI, dynamic_vts_h);
+		dynamic_vts_l = dynamic_vts & 0xFF;
+		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, OV50H40_VTS_LO, dynamic_vts_l);
 
 		temp0 = (sline >> 16) & 0xFF;
 		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, EXP_L_LINE0, temp0);
@@ -418,6 +445,70 @@ static int sensor_userspace_control(uint32_t port, uint32_t *enable)
 	return 0;
 }
 
+static int32_t sensor_update_fps_notify_driver(sensor_info_t *sensor_info)
+{
+	int32_t ret = RET_OK;
+
+	switch(sensor_info->sensor_mode) {
+		case (uint32_t)NORMAL_M:
+				ret = ov50h40_linear_data_init(sensor_info);
+				if (ret < 0) {
+						vin_err("update fps ov50h40_linear_data_init fail\n");
+						return ret;
+				}
+				break;
+		default:
+				vin_err("update fps not support %d mode \n", sensor_info->sensor_mode);
+				break;
+	}
+
+	return ret;
+}
+
+/* input value:
+ * fps: set fps
+ *
+ * we can use this function to dynamic switch fps in our program.
+ * int32_t hbn_camera_change_fps(camera_handle_t cam_fd, int32_t fps)
+ */
+static int32_t sensor_dynamic_switch_fps(sensor_info_t *sensor_info, uint32_t fps)
+{
+	int32_t ret = RET_OK;
+	int32_t vts;
+	int32_t vts_h,vts_l;
+
+	vin_info("%s %s %dfps \n", __FUNCTION__, sensor_info->sensor_name, fps);
+
+	if (fps < 1 || sensor_info->fps > 30) {
+			vin_err("%s %s %dfps not support\n", __FUNCTION__, sensor_info->sensor_name, fps);
+			return -RET_ERROR;
+	}
+
+	switch (sensor_info->sensor_mode) {
+			case NORMAL_M:
+					//NOTICE:
+					//vts = frame_length = lines_per_second / fps
+					vts = 32540 / fps;
+					break;
+			default:
+					vin_err("%s not support mode %d \n", __FUNCTION__, sensor_info->sensor_mode);
+					return -RET_ERROR;
+	}
+
+#ifdef AE_DBG
+	printf("%s set fps = %d, vts = 0x%x \n", __FUNCTION__, fps, vts);
+#endif
+	ret = hb_vin_i2c_write_reg16_data8(sensor_info->bus_num, sensor_info->sensor_addr,
+					OV50H40_VTS_HI, ((vts >> 8) & 0xff)); //0x380e[15:8]
+	ret |= hb_vin_i2c_write_reg16_data8(sensor_info->bus_num, sensor_info->sensor_addr,
+					OV50H40_VTS_LO, (vts & 0xff)); 	  //0x380f[7:0]
+
+	sensor_info->fps = fps;
+	sensor_update_fps_notify_driver(sensor_info);
+	vin_err("%s dynamic switch to %dfps success \n", sensor_info->sensor_name, fps);
+	return RET_OK;
+}
+
 #ifdef CAMERA_FRAMEWORK_HBN
 SENSOR_MODULE_F(ov50h40, CAM_MODULE_FLAG_A16D8);
 sensor_module_t ov50h40 = {
@@ -433,6 +524,7 @@ sensor_module_t ov50h40 = {
 	.power_on = sensor_poweron,
 	.power_off = sensor_poweroff,
 	.aexp_line_control = sensor_aexp_line_control,
+	.dynamic_switch_fps = sensor_dynamic_switch_fps,
 	.af_control = sensor_af_control,
 	.aexp_gain_control = sensor_aexp_gain_control,
 	.userspace_control = sensor_userspace_control,
