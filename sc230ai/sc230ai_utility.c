@@ -22,7 +22,7 @@
 #include "inc/sensor_effect_common.h"
 #include "hb_camera_data_config.h"
 
-int sc230ai_linear_data_init(sensor_info_t *sensor_info);
+int sc230ai_common_data_init(sensor_info_t *sensor_info);
 static int32_t sensor_dynamic_switch_fps(sensor_info_t *sensor_info, uint32_t fps);
 static int32_t sensor_update_fps_notify_driver(sensor_info_t *sensor_info);
 
@@ -98,7 +98,7 @@ int sensor_init(sensor_info_t *sensor_info)
                                 vin_err("%d : init %s fail\n", __LINE__, sensor_info->sensor_name);
                                 return -HB_CAM_I2C_WRITE_FAIL;
                         }
-                        ret = sc230ai_linear_data_init(sensor_info);
+                        ret = sc230ai_common_data_init(sensor_info);
                         if (ret < 0) {
                                 vin_err("%d : linear data init %s fail\n", __LINE__, sensor_info->sensor_name);
                                 return -HB_CAM_INIT_FAIL;
@@ -115,7 +115,7 @@ int sensor_init(sensor_info_t *sensor_info)
                                 vin_err("%d : init %s fail\n", __LINE__, sensor_info->sensor_name);
                                 return -HB_CAM_I2C_WRITE_FAIL;
                         }
-                        ret = sc230ai_linear_data_init(sensor_info);
+                        ret = sc230ai_common_data_init(sensor_info);
                         if (ret < 0) {
                                 vin_err("%d : linear data init %s fail\n", __LINE__, sensor_info->sensor_name);
                                 return -HB_CAM_INIT_FAIL;
@@ -133,7 +133,7 @@ int sensor_init(sensor_info_t *sensor_info)
                                 return -HB_CAM_I2C_WRITE_FAIL;
                         }
                         /*mabey need to change*/
-                        ret = sc230ai_linear_data_init(sensor_info);
+                        ret = sc230ai_common_data_init(sensor_info);
                         if (ret < 0) {
                                 vin_err("%d : dol2 data init %s fail\n", __LINE__, sensor_info->sensor_name);
                                 return -HB_CAM_INIT_FAIL;
@@ -224,7 +224,7 @@ int sensor_deinit(sensor_info_t *sensor_info)
         return ret;
 }
 
-int sc230ai_linear_data_init(sensor_info_t *sensor_info)
+int sc230ai_common_data_init(sensor_info_t *sensor_info)
 {
         int ret = RET_OK;
         uint32_t  open_cnt = 0;
@@ -272,9 +272,19 @@ int sc230ai_linear_data_init(sensor_info_t *sensor_info)
         turning_data.sensor_data.exposure_time_long_max = 2 * VTS_VALUE - 8;  //2*frame_length - 8  //linear not use
         turning_data.sensor_data.analog_gain_max = 251; //we use again + dig fine gain
         turning_data.sensor_data.digital_gain_max = 0;
-	turning_data.sensor_data.analog_gain_init = 64;
-	turning_data.sensor_data.digital_gain_init = 0;
-	turning_data.sensor_data.exposure_time_init = 377;
+        turning_data.sensor_data.analog_gain_init = 64;
+        turning_data.sensor_data.digital_gain_init = 0;
+        turning_data.sensor_data.exposure_time_init = 377;
+
+        if (sensor_info->sensor_mode == DOL2_M)
+        {
+            turning_data.dol2.line_p[0].ratio = 1 << 8;
+            turning_data.dol2.line_p[0].offset = 0;
+            turning_data.dol2.line_p[0].max = 66;
+            turning_data.dol2.line_p[1].ratio = 1 << 8;
+            turning_data.dol2.line_p[1].offset = 0;
+            turning_data.dol2.line_p[1].max = 2176;
+        }
 
         //sensor bit && bayer
         sensor_data_bayer_fill(&turning_data.sensor_data, 10, (uint32_t)BAYER_START_B, (uint32_t)BAYER_PATTERN_RGGB);
@@ -379,7 +389,7 @@ static void set_exposure_registers(hal_control_info_t *info, uint16_t exp_line0,
      char dgain_reg_value = 0, d_fine_gain_reg_value = 0;
      int gain_index = 0;
 
-     // Calculate Gain Index
+     // Calculate Linear/HDR Long Gain Index
      if (again[0] >= sizeof(sc230ai_gain_lut)/sizeof(uint32_t))
          gain_index = sizeof(sc230ai_gain_lut)/sizeof(uint32_t) - 1;
      else
@@ -400,22 +410,35 @@ static void set_exposure_registers(hal_control_info_t *info, uint16_t exp_line0,
          set_gain_registers(info, AGAIN, DGAIN, DFINE_GAIN,
                            again_reg_value, dgain_reg_value, d_fine_gain_reg_value);
      } else if(mode == DOL2_M) {
-         const uint16_t AGAIN_HDR_SHORT = 0x3e13;
-         const uint16_t DGAIN_HDR_SHORT = 0x3e10;
-         const uint16_t DFINE_GAIN_HDR_SHORT = 0x3e11;
+        int gain_short_index = 0;
+        const uint16_t AGAIN_HDR_SHORT = 0x3e13;
+        const uint16_t DGAIN_HDR_SHORT = 0x3e10;
+        const uint16_t DFINE_GAIN_HDR_SHORT = 0x3e11;
+        char again_short_reg_value = 0;
+        char dgain_short_reg_value = 0, d_fine_gain_short_reg_value = 0;
+
+        // Calculate HDR Short Gain Index
+        if (again[1] >= sizeof(sc230ai_gain_lut)/sizeof(uint32_t))
+            gain_short_index = sizeof(sc230ai_gain_lut)/sizeof(uint32_t) - 1;
+        else
+            gain_short_index = again[1];
 
  #ifdef AE_DBG
-         printf("%s, gain_index: %d, 0x3e13 = 0x%x dgain: 0x3e10 = 0x%x dig fine gain: 0x3e11 = 0x%x\n",
-                __FUNCTION__, gain_index, again_reg_value, dgain_reg_value, d_fine_gain_reg_value);
+        printf("%s, gain_short_index: %d, 0x3e13 = 0x%x dgain: 0x3e10 = 0x%x dig fine gain: 0x3e11 = 0x%x\n",
+                __FUNCTION__, gain_short_index, again_reg_value, dgain_reg_value, again[1]);
  #endif
 
-         // Set Long Exposure Gain,
-         set_gain_registers(info, AGAIN, DGAIN, DFINE_GAIN,
-                           again_reg_value, dgain_reg_value, d_fine_gain_reg_value);
+        // Calculate Gain Value
+        again_short_reg_value = (sc230ai_gain_lut[gain_short_index] >> 16) & 0x000000FF;
+        dgain_short_reg_value = (sc230ai_gain_lut[gain_short_index] >> 8) & 0x000000FF;
+        d_fine_gain_short_reg_value = sc230ai_gain_lut[gain_short_index] & 0x000000FF;
+        // Set Long Exposure Gain,
+        set_gain_registers(info, AGAIN, DGAIN, DFINE_GAIN,
+            again_reg_value, dgain_reg_value, d_fine_gain_reg_value);
 
-         // Set Short Exposure Gain
-         set_gain_registers(info, AGAIN_HDR_SHORT, DGAIN_HDR_SHORT, DFINE_GAIN_HDR_SHORT,
-                           again_reg_value, dgain_reg_value, d_fine_gain_reg_value);
+        // Set Short Exposure Gain
+        set_gain_registers(info, AGAIN_HDR_SHORT, DGAIN_HDR_SHORT, DFINE_GAIN_HDR_SHORT,
+            again_short_reg_value, dgain_short_reg_value, d_fine_gain_short_reg_value);
      } else {
          vin_err(" unsupport mode %d\n", mode);
      }
@@ -491,17 +514,17 @@ static int32_t sensor_update_fps_notify_driver(sensor_info_t *sensor_info)
         switch(sensor_info->sensor_mode) {
                 case (uint32_t)NORMAL_M:
                 case (uint32_t)SLAVE_M:
-                        ret = sc230ai_linear_data_init(sensor_info);
+                        ret = sc230ai_common_data_init(sensor_info);
                         if (ret < 0) {
-                                vin_err("update fps sc230ai_linear_data_init fail\n");
+                                vin_err("update fps sc230ai_common_data_init fail\n");
                                 return ret;
                         }
                         break;
                 case (uint32_t)DOL2_M:
                         /*mabey change*/
-                        ret = sc230ai_linear_data_init(sensor_info);
+                        ret = sc230ai_common_data_init(sensor_info);
                         if (ret < 0) {
-                                vin_err("update fps sc230ai_linear_data_init fail\n");
+                                vin_err("update fps sc230ai_common_data_init fail\n");
                                 return ret;
                         }
                         break;
