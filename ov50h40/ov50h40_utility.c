@@ -202,6 +202,7 @@ void ov50h40_common_data_init(sensor_info_t *sensor_info, sensor_turning_data_t 
 	turning_data->port = sensor_info->port;
 	turning_data->reg_width = sensor_info->reg_width;
 	turning_data->mode = sensor_info->sensor_mode;
+	turning_data->af_mode = 1;
 	turning_data->sensor_addr = sensor_info->sensor_addr;
 	strncpy(turning_data->sensor_name, sensor_info->sensor_name,
 					sizeof(turning_data->sensor_name));
@@ -227,6 +228,22 @@ void ov50h40_normal_data_init(sensor_info_t *sensor_info, sensor_turning_data_t 
 	turning_data->sensor_data.analog_gain_max = 191; //191
 	turning_data->sensor_data.digital_gain_max = 159;//31
 	turning_data->sensor_data.exposure_time_min = 2;
+	turning_data->sensor_data.pd_info.bit_width = 10;
+	turning_data->sensor_data.pd_info.sensor_type = PDAF_SENSOR_OCL2X1;
+	turning_data->sensor_data.pd_info.ocl2x1Shield = 0;
+	turning_data->sensor_data.pd_info.image_width = 4096;
+	turning_data->sensor_data.pd_info.image_height = 768;
+	turning_data->sensor_data.pd_info.pd_area[0] = 0;
+	turning_data->sensor_data.pd_info.pd_area[1] = 0;
+	turning_data->sensor_data.pd_info.pd_area[2] = 4096;
+	turning_data->sensor_data.pd_info.pd_area[3] = 768;
+	turning_data->sensor_data.pd_info.pd_num_per_area[0] = 2048;
+	turning_data->sensor_data.pd_info.pd_num_per_area[1] = 768;
+	turning_data->sensor_data.pd_info.pd_focal_heigh = 3;
+	turning_data->sensor_data.pd_info.pd_focal_width = 3;
+	turning_data->sensor_data.pd_info.pd_distance = 1;
+	int pdFocal[48] = {-45 , -45, -43, -44, -53, -42, -44, -46, -43};
+	memcpy(turning_data->sensor_data.pd_info.pdfocal,pdFocal,sizeof(turning_data->sensor_data.pd_info.pdfocal));
 }
 
 // turning data init
