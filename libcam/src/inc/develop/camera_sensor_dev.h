@@ -111,6 +111,25 @@ typedef enum enum_bayer_pattern_e
 
 	BAYER_PATTERN_BUTT
 } bayer_pattern_e;
+typedef enum PdafSensorType_enum {
+	PDAF_SENSOR_DUAL_PIXEL = 0, //Dual Pixel PDAF
+	PDAF_SENSOR_OCL2X1 = 1,     //OCL PDAF
+	PDAF_SENSOR_TYPE_MAX,
+} PdafSensorType_e;
+typedef struct pd_info_s
+{
+	uint8_t bit_width;			 // PD数据位宽bit
+	uint32_t sensor_type;        // PdafSensorType
+	uint32_t ocl2x1Shield;       // OCL Shield
+	uint32_t image_width;		 // PD宽度
+	uint32_t image_height;		 // PD高度
+	uint16_t pd_area[4];		 // PD有效区域坐标[start_x, start_y, end_x, end_y]
+	uint16_t pd_num_per_area[2]; // 每个区域的PD点数[水平, 垂直]
+	uint8_t pd_focal_heigh;		 // 焦距参数-高度方向,用于焦距计算或校准
+	uint8_t pd_focal_width;		 // 焦距参数-宽度方向,用于焦距计算或校准
+	uint8_t pd_distance;		 // 相位检测距离参数
+	uint32_t pdfocal[48];		 // 焦距校准参数
+} pd_info_t;
 
 /**
  * @struct sensor_data
@@ -145,6 +164,7 @@ typedef struct sensor_data {
 	uint32_t  delta_time;
 	uint32_t  active_width;
 	uint32_t  active_height;
+	pd_info_t pd_info;
 #ifndef COMP_XJ3_CAM
 	uint32_t  data_width;       // Bits per pixel.
 	uint32_t  bayer_start;      // RGGB pattern start (R/Gr/Gb/B).
@@ -553,4 +573,3 @@ extern int32_t camera_sensor_isi_dev_data_put(camera_module_lib_t *cal_lib, came
 #endif
 
 #endif /* __CAMERA_SENSOR_DEV_H__ */
-
