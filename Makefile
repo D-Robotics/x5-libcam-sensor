@@ -33,6 +33,13 @@ ifeq (${BUILD_OUTPUT_PATH},)
 export BUILD_OUTPUT_PATH=$(shell pwd)
 endif
 
+ifneq ($(wildcard $(IMAGE_DEPLOY_DIR)),)
+CC := $(CROSS_COMPILE)gcc
+MODULE_DEV_DIR := ${BUILD_OUTPUT_PATH}/../../../debian
+MODULE_RUNTIME_DIR := ${BUILD_OUTPUT_PATH}/../../../debian
+HB_PKG_LIBCAM_DEV_DEB := y
+endif
+
 ifeq ($(TARGET),)
 # make for all sub list
 
@@ -97,17 +104,26 @@ endif
 SO_SRCS = $(wildcard ./*.c)
 SO_OBJS = $(patsubst ./%,${BUILD_OUTPUT_PATH}/%,$(SO_SRCS:.c=.o))
 
+ifeq ($(wildcard $(IMAGE_DEPLOY_DIR)),)
 INCDIR = inc
 DEPS = $(SO_OBJS:.o=.d)
 -include $(DEPS)
+endif
 
 # builid params
 INCS := -I../../inc/legacy/inc -I../../inc/legacy/utility -I../../inc/legacy/utility/sensor $(INCS)
 INCS := -I. -I../../inc  -I../../inc/private -I../../inc/develop -I../../inc/legacy $(INCS)
+ifneq ($(wildcard $(IMAGE_DEPLOY_DIR)),)
+INCS := -I../../../include $(INCS)
+endif
 
 CFLAGS += -fPIC
 LIBS += -lcam -lpthread -lm -lrt
+ifneq ($(wildcard $(IMAGE_DEPLOY_DIR)),)
+LDFLAGS := -L${BUILD_OUTPUT_PATH}/../../ -L${BUILD_OUTPUT_PATH}/../../../lib -Wl,-rpath=/usr/lib/aarch64-linux-gnu/ -Wl,-rpath=${BUILD_OUTPUT_PATH}/../../../lib  -Wl,-rpath-link=${BUILD_OUTPUT_PATH}/../../../lib -shared $(LDFLAGS)
+else
 LDFLAGS := -L${BUILD_OUTPUT_PATH}/../../ -Wl,-rpath=/usr/lib/aarch64-linux-gnu/ $(LDFLAGS)
+endif
 
 CFLAGS += -Wno-unused-variable
 CFLAGS += -Wno-pointer-sign
@@ -116,6 +132,10 @@ CFLAGS += -Wno-unused-function
 CFLAGS += -Wno-unused-but-set-variable
 CFLAGS += -Wno-sizeof-pointer-memaccess
 CFLAGS += -fno-strict-aliasing
+ifneq ($(wildcard $(IMAGE_DEPLOY_DIR)),)
+#ADD CFLAGS_STATIC
+CFLAGS_STATIC = -rcs
+endif
 
 ifeq ($(TARGET), serial)
 # serial modules as a.
