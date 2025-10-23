@@ -137,15 +137,15 @@ int sensor_init(sensor_info_t *sensor_info)
 		}
 	}
 	if (sensor_info->width == 2016 && sensor_info->height == 1520) {
-		setting_size = sizeof(imx477_1520p_10fps_setting) / sizeof(uint32_t) / 2;
+		setting_size = sizeof(imx477_1520p_21fps_setting) / sizeof(uint32_t) / 2;
 		ret = vin_write_array(sensor_info->bus_num, sensor_info->sensor_addr, REG_WIDTH,
-			setting_size, imx477_1520p_10fps_setting);
+			setting_size, imx477_1520p_21fps_setting);
 		ret = imx477_linear_data_init(sensor_info);
 		if (ret < 0) {
 			vin_err("%d : linear data init %s fail\n", __LINE__, sensor_info->sensor_name);
 			return ret;
 		}
-	}	
+	}
 	vin_info("imx477 config success under %d mode\n\n", sensor_info->sensor_mode);
 
 	return ret;
