@@ -669,7 +669,7 @@ static uint32_t imx477_990p_10fps_setting[] = {
 	0x3f57, 0xbf,
 };
 
-static uint32_t imx477_1520p_10fps_setting[] = {
+static uint32_t imx477_1520p_21fps_setting[] = {
 	0x0342, 0x31,
 	0x0343, 0xc4,
 	0x0344, 0x00,
@@ -1153,4 +1153,3 @@ static uint32_t imx477_gain_lut[] = {
 #endif
 
 #endif  // UTILITY_SENSOR_INC_IMX415_SETTING_H_
-
