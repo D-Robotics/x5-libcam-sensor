@@ -259,6 +259,8 @@ int dummy_linear_data_init(sensor_info_t *sensor_info)
 {
 	int ret = RET_OK;
 	uint32_t  open_cnt = 0;
+	uint32_t format;
+	int32_t bayer_start, bayer_pattern, exposure_max_bit_width;
 	sensor_turning_data_t turning_data;
 
 	memset(&turning_data, 0, sizeof(sensor_turning_data_t));
@@ -287,7 +289,25 @@ int dummy_linear_data_init(sensor_info_t *sensor_info)
 	turning_data.sensor_data.digital_gain_max = 0;
 
 	//sensor bit && bayer
-	sensor_data_bayer_fill(&turning_data.sensor_data, 10, (uint32_t)BAYER_START_B, (uint32_t)BAYER_PATTERN_RGGB);
+	switch (sensor_info->format) {
+	case DATA_TYPE_RAW8:
+		format = 8;
+		break;
+	case DATA_TYPE_RAW10:
+		format = 10;
+		break;
+	case DATA_TYPE_RAW12:
+		format = 12;
+		break;
+	default:
+		format = 10;
+		break;
+	}
+	ret |= sensor_param_parse(sensor_info, "tuning_data/bayer_start", ISINT, &bayer_start);
+	ret |= sensor_param_parse(sensor_info, "tuning_data/bayer_pattern", ISINT, &bayer_pattern);
+	if (ret == 0)
+		sensor_data_bayer_fill(&turning_data.sensor_data, format, bayer_start, bayer_pattern);
+
 	sensor_data_bits_fill(&turning_data.sensor_data, 12);
 
 	ret = ioctl(sensor_info->sen_devfd, SENSOR_TURNING_PARAM, &turning_data);
@@ -415,4 +435,3 @@ sensor_module_t dummy = {
 	.start = sensor_start,
 	.stop = sensor_stop,
 };
-
