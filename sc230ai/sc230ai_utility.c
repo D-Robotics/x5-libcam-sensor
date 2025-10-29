@@ -275,6 +275,10 @@ int sc230ai_common_data_init(sensor_info_t *sensor_info)
         turning_data.sensor_data.analog_gain_init = 64;
         turning_data.sensor_data.digital_gain_init = 0;
         turning_data.sensor_data.exposure_time_init = 377;
+	// turning_data.sensor_data.user_define_delay = 1;
+	// turning_data.sensor_data.gain_delay_frame = 3;
+	// turning_data.sensor_data.line_delay_frame = 3;
+	// turning_data.sensor_data.ae_again_mode = 0;
 
         if (sensor_info->sensor_mode == DOL2_M)
         {
