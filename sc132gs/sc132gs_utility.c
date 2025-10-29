@@ -657,6 +657,7 @@ int sensor_start(sensor_info_t *sensor_info)
 
 	switch(sensor_info->sensor_mode) {
 	case NORMAL_M:
+	case SLAVE_M:
 		setting_size = sizeof(sc132gs_stream_on_setting)/sizeof(uint32_t)/2;
 		vin_info(" start linear mode, sensor_name %s, setting_size = %d\n", sensor_info->sensor_name, setting_size);
 		ret = vin_write_array(sensor_info->bus_num, sensor_info->sensor_addr, 2,
