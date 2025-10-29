@@ -131,6 +131,13 @@ typedef struct pd_info_s
 	uint32_t pdfocal[48];		 // 焦距校准参数
 } pd_info_t;
 
+typedef enum enum_ae_gain_mode_e
+{
+	ROUND_LOG_MODE      = 1,
+	ROUND_DB_MODE       = 2,
+	ROUND_MODE_BUTT
+} ae_gain_mode_e;
+
 /**
  * @struct sensor_data
  * sensor device base param struct
@@ -164,6 +171,11 @@ typedef struct sensor_data {
 	uint32_t  delta_time;
 	uint32_t  active_width;
 	uint32_t  active_height;
+	uint32_t  user_define_delay;
+	uint32_t  gain_delay_frame;
+	uint32_t  line_delay_frame;
+	uint32_t  ae_again_mode;
+	float     again_dB_step;
 	pd_info_t pd_info;
 #ifndef COMP_XJ3_CAM
 	uint32_t  data_width;       // Bits per pixel.
