@@ -305,8 +305,11 @@ int dummy_linear_data_init(sensor_info_t *sensor_info)
 	}
 	ret |= sensor_param_parse(sensor_info, "tuning_data/bayer_start", ISINT, &bayer_start);
 	ret |= sensor_param_parse(sensor_info, "tuning_data/bayer_pattern", ISINT, &bayer_pattern);
-	if (ret == 0)
+	if (ret == 0){
 		sensor_data_bayer_fill(&turning_data.sensor_data, format, bayer_start, bayer_pattern);
+	}else {
+		sensor_data_bayer_fill(&turning_data.sensor_data, format, BAYER_START_B, BAYER_PATTERN_RGGB);
+	}
 
 	sensor_data_bits_fill(&turning_data.sensor_data, 12);
 
