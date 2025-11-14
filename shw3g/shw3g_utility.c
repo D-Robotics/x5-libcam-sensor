@@ -6,6 +6,7 @@
 #define pr_fmt(fmt)		"[shw3g]:" fmt
 
 #define SENSOR_ADDRESS 		(0x36)
+#define AE_DBG 				1
 
 #include <stdint.h>
 #include <stdio.h>
@@ -225,13 +226,114 @@ int32_t sensor_poweron(sensor_info_t *sensor_info)
 	return ret;
 }
 
+void shw3g_commmon_data_init(sensor_info_t *sensor_info, sensor_turning_data_t *turning_data)
+{
+	// common data
+	turning_data->bus_num = sensor_info->bus_num;
+	turning_data->bus_type = sensor_info->bus_type;
+	turning_data->port = sensor_info->port;
+	turning_data->reg_width = sensor_info->reg_width;
+	turning_data->mode = sensor_info->sensor_mode;
+	turning_data->sensor_addr = sensor_info->sensor_addr;
+	strncpy(turning_data->sensor_name, sensor_info->sensor_name,
+			sizeof(turning_data->sensor_name));
+}
+
+void shw3g_param_data_init(sensor_info_t *sensor_info, sensor_turning_data_t *turning_data)
+{
+
+	// int vts_hi = hb_vin_i2c_read_reg16_data8(sensor_info->bus_num, sensor_info->sensor_addr, IMX219_FRM_LENGTH_HI);
+	// int vts_lo = hb_vin_i2c_read_reg16_data8(sensor_info->bus_num, sensor_info->sensor_addr, IMX219_FRM_LENGTH_LO);
+	// uint32_t vts = vts_hi;
+	// vts = vts << 8 | vts_lo;
+	// pr_info("IMX219: vts_hi:0x%x,vts_lo:0x%x,vts:0x%x\n", vts_hi, vts_lo, vts);
+	uint32_t vts = 2877;
+
+	turning_data->sensor_data.active_width = sensor_info->width;
+	turning_data->sensor_data.active_height = sensor_info->height;
+	// turning sensor_data
+	turning_data->sensor_data.conversion = 1;
+	turning_data->sensor_data.turning_type = 6;
+	turning_data->sensor_data.lines_per_second = vts * sensor_info->fps;
+	turning_data->sensor_data.exposure_time_max = vts;
+	turning_data->sensor_data.exposure_time_long_max = vts;
+	turning_data->sensor_data.analog_gain_max = 255;
+	turning_data->sensor_data.digital_gain_max = 0;
+	turning_data->sensor_data.exposure_time_min = 1;
+}
+
+
+static int shw3g_linear_data_init(sensor_info_t *sensor_info)
+{
+	int ret = RET_OK;
+	uint32_t  open_cnt = 0;
+	sensor_turning_data_t turning_data;
+	uint32_t *stream_on = turning_data.stream_ctrl.stream_on;
+	uint32_t *stream_off = turning_data.stream_ctrl.stream_off;
+
+	memset(&turning_data, 0, sizeof(sensor_turning_data_t));
+
+	// common data
+	shw3g_commmon_data_init(sensor_info,&turning_data);
+	shw3g_param_data_init(sensor_info,&turning_data);
+
+	//sensor bit && bayer
+	sensor_data_bayer_fill(&turning_data.sensor_data, 12, (uint32_t)BAYER_START_R, (uint32_t)BAYER_PATTERN_RGGB);
+	// sensor exposure_max_bit, maybe not used ?  //FIXME
+	sensor_data_bits_fill(&turning_data.sensor_data, 12);
+
+	//some stress test case, we need kernel stream_ctrl.
+	turning_data.stream_ctrl.data_length = 1;
+
+	if(sizeof(turning_data.stream_ctrl.stream_on) >= sizeof(sensor_stream_on_setting)) {
+		memcpy(stream_on, sensor_stream_on_setting, sizeof(sensor_stream_on_setting));
+	} else {
+		vin_err("Number of registers on stream over 10\n");
+		return -RET_ERROR;
+	}
+	if(sizeof(turning_data.stream_ctrl.stream_off) >= sizeof(sensor_stream_off_setting)) {
+		memcpy(stream_off, sensor_stream_off_setting, sizeof(sensor_stream_off_setting));
+	} else {
+		vin_err("Number of registers on stream over 10\n");
+		return -RET_ERROR;
+	}
+
+	// sync gain lut to kernel driver.
+	turning_data.normal.again_lut = malloc(256 * sizeof(uint32_t));
+	if (turning_data.normal.again_lut != NULL) {
+		memset(turning_data.normal.again_lut, 0xff, 256 * sizeof(uint32_t));
+		memcpy(turning_data.normal.again_lut, shw3g_gain_lut,
+			sizeof(shw3g_gain_lut));
+	}
+
+	ret = ioctl(sensor_info->sen_devfd, SENSOR_TURNING_PARAM, &turning_data);
+
+	if (turning_data.normal.again_lut) {
+		free(turning_data.normal.again_lut);
+		turning_data.normal.again_lut = NULL;
+	}
+
+	if (ret < 0) {
+		vin_err("%s sync gain lut ioctl fail %d\n", sensor_info->sensor_name, ret);
+		return -RET_ERROR;
+	}
+
+	return ret;
+}
+
+
 int32_t sensor_mode_config_init(sensor_info_t *sensor_info)
 {
 	int32_t ret = RET_OK;
 
 	switch(sensor_info->sensor_mode) {
 		case NORMAL_M:
-			vin_info("linear mode Reserved interface\n");
+			shw3g_linear_data_init(sensor_info);
+			vin_info("linear master mode Reserved interface\n");
+			break;
+		case SLAVE_M:
+			shw3g_linear_data_init(sensor_info);
+			vin_info("linear slave mode Reserved interface\n");
 			break;
 		default:
 			vin_err("not support mode %d\n", sensor_info->sensor_mode);
@@ -367,6 +469,84 @@ int32_t sensor_deinit(sensor_info_t *sensor_info)
 	return ret;
 }
 
+static int sensor_aexp_gain_control(hal_control_info_t *info, uint32_t mode, uint32_t *again, uint32_t *dgain, uint32_t gain_num)
+{
+#ifdef AE_DBG
+		printf("test %s, mode = %d gain_num = %d again[0] = %d, dgain[0] = %d\n", __FUNCTION__, mode, gain_num, again[0], dgain[0]);
+#endif
+
+	const uint16_t AGAIN_L = 0x3514;
+		const uint16_t AGAIN_H = 0x3515;
+	char again_reg_value_L = 0;
+	char again_reg_value_H = 0;
+	int gain_index = 0;
+
+		if (mode == NORMAL_M || mode == SLAVE_M) {
+			if (again[0] >= shw3g_gain_lut[sizeof(shw3g_gain_lut)/sizeof(uint32_t)-1])
+			gain_index = shw3g_gain_lut[sizeof(shw3g_gain_lut)/sizeof(uint32_t) - 1];
+		else
+			gain_index = again[0];
+
+		again_reg_value_L = shw3g_gain_lut[gain_index] & 0xFF;
+		again_reg_value_H = (shw3g_gain_lut[gain_index] >> 8) & 0x01;
+#ifdef AE_DBG
+				printf("%s, gain_index: %d, again_l: 0x3514 = 0x%x, again_h: 0x3515 = 0x%x\n",
+				__FUNCTION__, gain_index, again_reg_value_L, again_reg_value_H);
+#endif
+		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, AGAIN_L, again_reg_value_L);
+		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, AGAIN_H, again_reg_value_H);
+	} else	{
+		vin_err(" unsupport mode %d\n", mode);
+	}
+
+	return 0;
+}
+
+static int sensor_aexp_line_control(hal_control_info_t *info, uint32_t mode, uint32_t *line, uint32_t line_num)
+{
+#ifdef AE_DBG
+		printf("%s, line mode %d,   line[0]: %d, line_num: %d \n", __func__, mode,  line[0], line_num);
+#endif
+
+		char temp0 = 0, temp1 = 0, temp2 = 0;
+		uint32_t shs;
+		uint32_t val = line[0];
+
+		if (mode == NORMAL_M || mode == SLAVE_M) {
+				shs = IMX900_EXPOSURE_LINE - val ;
+
+				if (shs > IMX900_MAX_SHS)
+						shs = IMX900_MAX_SHS;
+				else if (shs < IMX900_MIN_SHS)
+						shs = IMX900_MIN_SHS;
+
+				temp0 = shs & 0xff;
+				vin_i2c_write8(info->bus_num, 16, info->sensor_addr, 0x3240, temp0);
+				temp1 = (shs >> 8) & 0xFF;
+				vin_i2c_write8(info->bus_num, 16, info->sensor_addr, 0x3241, temp1);
+				temp2 = (shs >> 16) & 0xFF;
+				vin_i2c_write8(info->bus_num, 16, info->sensor_addr, 0x3242, temp2);
+
+#ifdef AE_DBG
+				printf("%s, write sline = %d, 0x3240 = 0x%x, 0x3241 = 0x%x, 0x3242 = 0x%x \n",
+								__func__, shs, temp0, temp1, temp2);
+#endif
+		} else {
+				vin_err(" unsupport mode %d\n", mode);
+		}
+
+		return 0;
+}
+
+static int sensor_userspace_control(uint32_t port, uint32_t *enable)
+{
+	vin_info("enable userspace gain control and line control\n");
+	// *enable = 0;	//imx415 use kernel space gain contrl and line control
+	*enable = HAL_GAIN_CONTROL | HAL_LINE_CONTROL;
+	return 0;
+}
+
+
 int32_t sensor_poweroff(sensor_info_t *sensor_info)
 {
 	int32_t gpio, ret = RET_OK;
@@ -388,6 +568,9 @@ sensor_module_t shw3g = {
 	.start = sensor_start,
 	.stop = sensor_stop,
 	.deinit = sensor_deinit,
+	.aexp_gain_control = sensor_aexp_gain_control,
+	.aexp_line_control = sensor_aexp_line_control,
+	.userspace_control = sensor_userspace_control,
 	.power_on = sensor_poweron,
 	.power_off = sensor_poweroff,
 };
