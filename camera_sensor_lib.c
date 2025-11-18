@@ -952,7 +952,7 @@ static int32_t camera_sensor_ctrl_do(sensor_module_t *m, uint32_t enable, hal_co
 			FIELD_CHANGED(info, old_info, gain_num)) {
 			ret |= m->aexp_gain_control(ctrl, info->mode, info->gain_buf, info->dgain_buf, info->gain_num);
 		} else {
-			cam_warn("%s gain same, ignore gain control\n", __func__);
+			cam_dbg("%s gain same, ignore gain control\n", __func__);
 		}
 		camera_debug_loop_camo(ctrl->port, 3U, "aexp_gain_control");
 	}
@@ -965,7 +965,7 @@ static int32_t camera_sensor_ctrl_do(sensor_module_t *m, uint32_t enable, hal_co
 			FIELD_CHANGED(info, old_info, line_num)) {
 			ret |= m->aexp_line_control(ctrl, info->mode, info->line_buf, info->line_num);
 		} else {
-			cam_warn("%s line same, ignore line control\n", __func__);
+			cam_dbg("%s line same, ignore line control\n", __func__);
 		}
 		camera_debug_loop_cami(ctrl->port, 4U, "aexp_line_control");
 	}
@@ -982,7 +982,7 @@ static int32_t camera_sensor_ctrl_do(sensor_module_t *m, uint32_t enable, hal_co
 			ret |= m->aexp_line_gain_control(ctrl, info->mode, info->line_buf, info->line_num,
 				info->gain_buf, info->dgain_buf, info->gain_num);
 		} else {
-			cam_warn("%s line/gain same, ignore line/gain control\n", __func__);
+			cam_dbg("%s line/gain same, ignore line/gain control\n", __func__);
 		}
 		camera_debug_loop_camo(ctrl->port, 5U, "aexp_line_gain_control");
 	}
@@ -1010,7 +1010,7 @@ static int32_t camera_sensor_ctrl_do(sensor_module_t *m, uint32_t enable, hal_co
 			FIELD_CHANGED(info, old_info, af_pos)) {
 			ret |= m->af_control(ctrl, info->mode, info->af_pos);
 		} else {
-			cam_warn("%s af same, ignore af control\n", __func__);
+			cam_dbg("%s af same, ignore af control\n", __func__);
 		}
 		camera_debug_loop_camo(ctrl->port, 8U, "af_control");
 	}
