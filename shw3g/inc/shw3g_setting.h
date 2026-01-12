@@ -18,11 +18,14 @@
 #define DELAY1_FLAG 0xFF
 
 #define IMX900_EXPOSURE_ONE_LINE_TIME       (11590) // 11.59
-#define IMX900_EXPOSURE_LINE                (1656)
+#define IMX900_EXPOSURE_LINE                (1638)
 #define IMX900_EXPOSURE_FIXED_DELAY         (1550) // 1.55us
 #define IMX900_EXPOSURE_INCREASE_MULTIPLIER (1000)
 #define IMX900_MIN_SHS                      (51)
-#define IMX900_MAX_SHS                      (1656)
+#define IMX900_MAX_SHS                      (1688)
+#define IMX900_NUMBER_OF_LINES_PER_FRAME    (1689)
+#define IMX900_FRAME_RATE                   (72)
+
 // 在头文件中定义此宏来控制回读验证
 //#define ENABLE_READBACK_VERIFICATION 0
 
@@ -118,8 +121,8 @@ uint32_t sensor_init_setting[] = {
 	0x3019, 0x01,
 	0x301C, 0x08,
 	0x303A, 0x17,
-	0x30D4, 0x3D,
-	0x30D5, 0x0B,
+	0x30D4, 0x99,
+	0x30D5, 0x06,
 	0x30D8, 0x5C,
 	0x30D9, 0x03,
 	0x30E2, 0x0C,
@@ -495,8 +498,6 @@ uint32_t sensor_init_setting[] = {
 	DELAY1_FLAG, 0xff,
 	DELAY1_FLAG, 0xff,
 	0x3514, 0x40,
-	0x30D4, 0x3D,
-	0x30D5, 0x0B
 };
 
 uint32_t max96712_init_setting_step2[] = {

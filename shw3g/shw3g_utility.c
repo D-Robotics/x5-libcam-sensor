@@ -247,19 +247,19 @@ void shw3g_param_data_init(sensor_info_t *sensor_info, sensor_turning_data_t *tu
 	// uint32_t vts = vts_hi;
 	// vts = vts << 8 | vts_lo;
 	// pr_info("IMX219: vts_hi:0x%x,vts_lo:0x%x,vts:0x%x\n", vts_hi, vts_lo, vts);
-	uint32_t vts = 2877;
+	uint32_t vts = 1689;  // (VTS_HIGH << 8 | VTS_LOW);   VTS_HIGH 0x30d5 , VTS_LOW 0x30d4
 
 	turning_data->sensor_data.active_width = sensor_info->width;
 	turning_data->sensor_data.active_height = sensor_info->height;
 	// turning sensor_data
 	turning_data->sensor_data.conversion = 1;
-	turning_data->sensor_data.turning_type = 6;
-	turning_data->sensor_data.lines_per_second = vts * sensor_info->fps;
-	turning_data->sensor_data.exposure_time_max = vts;
-	turning_data->sensor_data.exposure_time_long_max = vts;
+	// turning_data->sensor_data.turning_type = 6;
+	turning_data->sensor_data.lines_per_second = vts * IMX900_FRAME_RATE;
+	turning_data->sensor_data.exposure_time_max = 1638;
+	turning_data->sensor_data.exposure_time_min = 1;
+	turning_data->sensor_data.exposure_time_long_max = 2 * vts - 8;  //2*frame_length - 8  //linear not use;
 	turning_data->sensor_data.analog_gain_max = 255;
 	turning_data->sensor_data.digital_gain_max = 0;
-	turning_data->sensor_data.exposure_time_min = 1;
 }
 
 
@@ -512,8 +512,13 @@ static int sensor_aexp_line_control(hal_control_info_t *info, uint32_t mode, uin
 		uint32_t shs;
 		uint32_t val = line[0];
 
+		// Integration time [µs] = (1 H period [µs] ) × (Number of lines per frame - SHS) + 1.55 [µs]
+		// SHS = Number of lines per frame - (Integration time [µs] - 1.55 [µs]) / (1 H period [µs] )
+		// 1.55 [µs] / (1 H period [µs] ) is too small, ignore it.
+		// SHS = Number of lines per frame - (Integration time [µs]) / (1 H period [µs] )
+		// SHS = Number of lines per frame - (Exposure time in lines)
 		if (mode == NORMAL_M || mode == SLAVE_M) {
-				shs = IMX900_EXPOSURE_LINE - val ;
+				shs = IMX900_NUMBER_OF_LINES_PER_FRAME - val;
 
 				if (shs > IMX900_MAX_SHS)
 						shs = IMX900_MAX_SHS;
