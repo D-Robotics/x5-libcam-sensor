@@ -84,6 +84,15 @@ int sensor_init(sensor_info_t *sensor_info)
 			return ret;
 	}
 
+	/** common setting start**/
+	setting_size = sizeof(ov50h40_common_regs) / sizeof(uint32_t) / 2;
+	ret = vin_write_array(sensor_info->bus_num, sensor_info->sensor_addr, 2,
+		setting_size, ov50h40_common_regs);
+	if (ret < 0) {
+		vin_err("%d : common setting %s fail\n", __LINE__, sensor_info->sensor_name);
+		return ret;
+	}
+
 	// set resolution and format
 	if (sensor_info->resolution == 3072) {
 		pr_debug("ov50h40 resolution is 3072 \n");
@@ -92,6 +101,18 @@ int sensor_init(sensor_info_t *sensor_info)
 		ret = vin_write_array(sensor_info->bus_num,
 								sensor_info->sensor_addr, 2,
 								setting_size, ov50h40_4096x3072_30fps_24MHz_linear_10bit_2000Mbps_4lane);
+		if (ret < 0) {
+			pr_err("%d : init %s fail\n",
+					__LINE__, sensor_info->sensor_name);
+			return ret;
+		}
+	} else if(sensor_info->resolution == 2160) {
+		pr_debug("ov50h40 resolution is 2160p \n");
+		setting_size =
+				sizeof(ov50h40_3840x2160_30fps_24MHz_linear_10bit_1800Mbps_4lane) / sizeof(uint32_t) / 2;
+		ret = vin_write_array(sensor_info->bus_num,
+								sensor_info->sensor_addr, 2,
+								setting_size, ov50h40_3840x2160_30fps_24MHz_linear_10bit_1800Mbps_4lane);
 		if (ret < 0) {
 			pr_err("%d : init %s fail\n",
 					__LINE__, sensor_info->sensor_name);
