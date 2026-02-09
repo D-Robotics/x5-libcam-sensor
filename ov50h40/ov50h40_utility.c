@@ -29,6 +29,7 @@
 #define OV50H40_HTS_LO  0x380d
 #define OV50H40_VTS_HI  0x380e
 #define OV50H40_VTS_LO  0x380f
+#define OV50H40_DCG_EN  0x3680
 
 #define DW9800_VCM_ADDR 0x0c //ov50h VCM address
 
@@ -43,6 +44,9 @@ int sensor_af_init(sensor_info_t *info)
 static int ov50h40_linear_data_init(sensor_info_t *sensor_info);
 static int32_t sensor_dynamic_switch_fps(sensor_info_t *sensor_info, uint32_t fps);
 static int32_t sensor_update_fps_notify_driver(sensor_info_t *sensor_info);
+static int sensor_dcg_mode_gain_control(hal_control_info_t *info, int again_index, int dgain_index);
+static int sensor_normal_mode_gain_control(hal_control_info_t *info, int again_index, int dgain_index);
+
 int sensor_poweron(sensor_info_t *sensor_info)
 {
 	int gpio, ret = RET_OK;
@@ -94,13 +98,25 @@ int sensor_init(sensor_info_t *sensor_info)
 	}
 
 	// set resolution and format
-	if (sensor_info->resolution == 3072) {
-		pr_debug("ov50h40 resolution is 3072 \n");
+	if (sensor_info->resolution == 3072 && sensor_info->format == 0x2B) {
+		pr_err("ov50h40 resolution is 3072 format:%#x\n",sensor_info->format);
 		setting_size =
 				sizeof(ov50h40_4096x3072_30fps_24MHz_linear_10bit_2000Mbps_4lane) / sizeof(uint32_t) / 2;
 		ret = vin_write_array(sensor_info->bus_num,
 								sensor_info->sensor_addr, 2,
 								setting_size, ov50h40_4096x3072_30fps_24MHz_linear_10bit_2000Mbps_4lane);
+		if (ret < 0) {
+			pr_err("%d : init %s fail\n",
+					__LINE__, sensor_info->sensor_name);
+			return ret;
+		}
+	} else if(sensor_info->resolution == 3072 && sensor_info->format == 0x2D) {
+		pr_err("ov50h40 resolution is 3072 format:%#x\n",sensor_info->format);
+		setting_size =
+				sizeof(ov50h40_4096x3072_30fps_24MHz_linear_14bit_1800Mbps_4lane) / sizeof(uint32_t) / 2;
+		ret = vin_write_array(sensor_info->bus_num,
+								sensor_info->sensor_addr, 2,
+								setting_size, ov50h40_4096x3072_30fps_24MHz_linear_14bit_1800Mbps_4lane);
 		if (ret < 0) {
 			pr_err("%d : init %s fail\n",
 					__LINE__, sensor_info->sensor_name);
@@ -243,8 +259,9 @@ void ov50h40_normal_data_init(sensor_info_t *sensor_info, sensor_turning_data_t 
 	turning_data->sensor_data.conversion = 1;
 	turning_data->sensor_data.turning_type = 6;
 	turning_data->sensor_data.lines_per_second = vts * sensor_info->fps;
+	sensor_info->lines_per_second = turning_data->sensor_data.lines_per_second;
 	turning_data->sensor_data.exposure_time_max = vts - 36;
-	printf("exposure_time_max: %d\n",turning_data->sensor_data.exposure_time_max);
+	printf("lines_per_second: %d\n",turning_data->sensor_data.lines_per_second);
 	turning_data->sensor_data.exposure_time_long_max = vts;
 	turning_data->sensor_data.analog_gain_max = 191; //191
 	turning_data->sensor_data.digital_gain_max = 159;//31
@@ -281,8 +298,11 @@ static int ov50h40_linear_data_init(sensor_info_t *sensor_info)
 	// common data
 	ov50h40_common_data_init(sensor_info, &turning_data);
 	ov50h40_normal_data_init(sensor_info, &turning_data);
-
-	sensor_data_bayer_fill(&turning_data.sensor_data, 10, (uint32_t)BAYER_START_B, (uint32_t)BAYER_PATTERN_RGGB);
+	if(sensor_info->format == 0x2D){
+		sensor_data_bayer_fill(&turning_data.sensor_data, 14, (uint32_t)BAYER_START_B, (uint32_t)BAYER_PATTERN_RGGB);
+	}else{
+		sensor_data_bayer_fill(&turning_data.sensor_data, 10, (uint32_t)BAYER_START_B, (uint32_t)BAYER_PATTERN_RGGB);
+	}
 	sensor_data_bits_fill(&turning_data.sensor_data, 12);
 
 	// setting stream ctrl
@@ -372,16 +392,6 @@ static int sensor_aexp_gain_control(hal_control_info_t *info, uint32_t mode, uin
 	printf("test %s, mode = %d gain_num = %d again[0] = %d, dgain[0] = %d\n", __FUNCTION__, mode, gain_num, again[0], dgain[0]);
 #endif
 
-	//again
-	const uint16_t COARSE_AGAIN_H = 0x3508; //[0:7] 64x
-	const uint16_t FINE_AGAIN_L = 0x3509;   //[0:7]
-	//dgain
-	const uint16_t COARSE_DGAIN_L = 0x350A; //[0:4] 31x
-	const uint16_t FINE_DGAIN_H = 0x350B;   //[0:7]
-	const uint16_t FINE_DGAIN_L = 0x350C;   //[6:7]
-
-	char again_reg_value_h = 0,again_reg_value_l = 0;
-	char coarse_dgain_l = 0,fine_dgain_h = 0,fine_dgain_l = 0;
 	int again_index = 0;
 	int dgain_index = 0;
 
@@ -396,30 +406,116 @@ static int sensor_aexp_gain_control(hal_control_info_t *info, uint32_t mode, uin
 		else
 			dgain_index = dgain[0];
 
+		char ov50h40_dcg_en = hb_vin_i2c_read_reg16_data8(info->bus_num, info->sensor_addr, OV50H40_DCG_EN);
 
-		//config again
-		again_reg_value_h = (ov50h40_again_lut[again_index] >> 8) & 0xFF;
-		again_reg_value_l = (ov50h40_again_lut[again_index]) & 0xFF;
-		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, COARSE_AGAIN_H, again_reg_value_h);
-		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, FINE_AGAIN_L, again_reg_value_l);
-		//config dgain
-		coarse_dgain_l = (ov50h40_dgain_lut[dgain_index] >> 16) & 0x1F;
-		fine_dgain_h = (ov50h40_dgain_lut[dgain_index] >> 8) & 0xFF;
-		fine_dgain_l = (ov50h40_dgain_lut[dgain_index]) & 0xC0;
-		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, COARSE_DGAIN_L, coarse_dgain_l);
-		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, FINE_DGAIN_H, fine_dgain_h);
-		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, FINE_DGAIN_L, fine_dgain_l);
-#ifdef AE_DBG
-		printf("%s, gain_index: %d, COARSE_AGAIN_H:0x3508 = 0x%x, FINE_AGAIN_L:0x3509 = 0x%x, COARSE_DGAIN_L:0x350A = 0x%x, FINE_DGAIN_H:0x350B = 0x%x, FINE_DGAIN_L:0x350C = 0x%x\n",
-		__FUNCTION__, again_index, again_reg_value_h, again_reg_value_l,coarse_dgain_l,fine_dgain_h,fine_dgain_l);
-#endif
-	} else	{
+		if(ov50h40_dcg_en == 0x1){ //DCG
+			return sensor_dcg_mode_gain_control(info, again_index, dgain_index);
+		} else {                   //normal
+			return sensor_normal_mode_gain_control(info, again_index, dgain_index);
+		}
+	} else {
 		vin_err(" unsupport mode %d\n", mode);
+		return -1;
 	}
 
 	return 0;
 }
 
+static int sensor_dcg_mode_gain_control(hal_control_info_t *info, int again_index, int dgain_index)
+{
+	// again - HCG gain
+	const uint16_t COARSE_AGAIN_H = 0x3508;     //[0:7] 64x
+	const uint16_t FINE_AGAIN_L = 0x3509;       //[0:7]
+	// LCG gain - DCG mode
+	const uint16_t LCG_COARSE_GAIN_H = 0x3548;  // LCG gain high byte
+	const uint16_t LCG_FINE_GAIN_L = 0x3549;    // LCG gain low byte
+	// DCG related registers
+	const uint16_t HCG_GAIN_SCALE_H = 0x501A;   // HCG gain scale high byte
+	const uint16_t HCG_GAIN_SCALE_L = 0x501B;   // HCG gain scale low byte
+	const uint16_t LCG_GAIN_SCALE_H = 0x501D;   // LCG gain scale high byte
+	const uint16_t LCG_GAIN_SCALE_L = 0x501E;   // LCG gain scale low byte
+
+	char again_reg_value_h = 0, again_reg_value_l = 0;
+	char lcg_again_reg_value_h = 0, lcg_again_reg_value_l = 0;
+
+	//NOTICE: DCG gain config from sensor FAE
+	// Get LCG gain value from LUT (as base value)
+	uint32_t lcg_gain_value = ov50h40_again_lut[again_index];
+
+	// Calculate HCG gain value = LCG gain value × 4
+	uint32_t hcg_gain_value = lcg_gain_value * 4;
+
+	// 1. Set LCG gain
+	lcg_again_reg_value_h = (lcg_gain_value >> 8) & 0xFF;
+	lcg_again_reg_value_l = lcg_gain_value & 0xFF;
+	vin_i2c_write8(info->bus_num, 16, info->sensor_addr, LCG_COARSE_GAIN_H, lcg_again_reg_value_h);
+	vin_i2c_write8(info->bus_num, 16, info->sensor_addr, LCG_FINE_GAIN_L, lcg_again_reg_value_l);
+
+	// 2. Set LCG gain scale -> 0x501d,0x501e = LCG gain value * 4
+	uint32_t lcg_gain_scaled = lcg_gain_value * 4;
+	vin_i2c_write8(info->bus_num, 16, info->sensor_addr, LCG_GAIN_SCALE_H, (lcg_gain_scaled >> 8) & 0xFF);
+	vin_i2c_write8(info->bus_num, 16, info->sensor_addr, LCG_GAIN_SCALE_L, lcg_gain_scaled & 0xFF);
+
+	// 3. Set HCG gain -> 0x3508, 0x3509 = LCG gain value × 4
+	again_reg_value_h = (hcg_gain_value >> 8) & 0xFF;
+	again_reg_value_l = hcg_gain_value & 0xFF;
+	vin_i2c_write8(info->bus_num, 16, info->sensor_addr, COARSE_AGAIN_H, again_reg_value_h);
+	vin_i2c_write8(info->bus_num, 16, info->sensor_addr, FINE_AGAIN_L, again_reg_value_l);
+
+	// 4. Set HCG gain scale -> 0x501a,0x501b = HCG gain value * 4
+	// HCG gain is already 4x of LCG, so here ×4 again = LCG × 16
+	uint32_t hcg_gain_scaled = hcg_gain_value * 4; // = lcg_gain_value * 16
+	vin_i2c_write8(info->bus_num, 16, info->sensor_addr, HCG_GAIN_SCALE_H, (hcg_gain_scaled >> 8) & 0xFF);
+	vin_i2c_write8(info->bus_num, 16, info->sensor_addr, HCG_GAIN_SCALE_L, hcg_gain_scaled & 0xFF);
+
+#ifdef AE_DBG
+	printf("%s, DCG Mode: again_index: %d\n", __FUNCTION__, again_index);
+	printf("LCG: 0x%04x, HCG: 0x%04x\n", lcg_gain_value, hcg_gain_value);
+	printf("0x3548=0x%02x, 0x3549=0x%02x, 0x501d=0x%02x, 0x501e=0x%02x\n",
+			lcg_again_reg_value_h, lcg_again_reg_value_l,
+			(lcg_gain_scaled >> 8) & 0xFF, lcg_gain_scaled & 0xFF);
+	printf("0x3508=0x%02x, 0x3509=0x%02x, 0x501a=0x%02x, 0x501b=0x%02x\n",
+			again_reg_value_h, again_reg_value_l,
+			(hcg_gain_scaled >> 8) & 0xFF, hcg_gain_scaled & 0xFF);
+#endif
+
+	return 0;
+}
+
+static int sensor_normal_mode_gain_control(hal_control_info_t *info, int again_index, int dgain_index)
+{
+	// again
+	const uint16_t COARSE_AGAIN_H = 0x3508; //[0:7] 64x
+	const uint16_t FINE_AGAIN_L = 0x3509;   //[0:7]
+	// dgain
+	const uint16_t COARSE_DGAIN_L = 0x350A; //[0:4] 31x
+	const uint16_t FINE_DGAIN_H = 0x350B;   //[0:7]
+	const uint16_t FINE_DGAIN_L = 0x350C;   //[6:7]
+
+	char again_reg_value_h = 0, again_reg_value_l = 0;
+	char coarse_dgain_l = 0, fine_dgain_h = 0, fine_dgain_l = 0;
+
+	// config again
+	again_reg_value_h = (ov50h40_again_lut[again_index] >> 8) & 0xFF;
+	again_reg_value_l = (ov50h40_again_lut[again_index]) & 0xFF;
+	vin_i2c_write8(info->bus_num, 16, info->sensor_addr, COARSE_AGAIN_H, again_reg_value_h);
+	vin_i2c_write8(info->bus_num, 16, info->sensor_addr, FINE_AGAIN_L, again_reg_value_l);
+
+	// config dgain
+	coarse_dgain_l = (ov50h40_dgain_lut[dgain_index] >> 16) & 0x1F;
+	fine_dgain_h = (ov50h40_dgain_lut[dgain_index] >> 8) & 0xFF;
+	fine_dgain_l = (ov50h40_dgain_lut[dgain_index]) & 0xC0;
+	vin_i2c_write8(info->bus_num, 16, info->sensor_addr, COARSE_DGAIN_L, coarse_dgain_l);
+	vin_i2c_write8(info->bus_num, 16, info->sensor_addr, FINE_DGAIN_H, fine_dgain_h);
+	vin_i2c_write8(info->bus_num, 16, info->sensor_addr, FINE_DGAIN_L, fine_dgain_l);
+
+#ifdef AE_DBG
+	printf("%s, gain_index: %d, COARSE_AGAIN_H:0x3508 = 0x%x, FINE_AGAIN_L:0x3509 = 0x%x, COARSE_DGAIN_L:0x350A = 0x%x, FINE_DGAIN_H:0x350B = 0x%x, FINE_DGAIN_L:0x350C = 0x%x\n",
+			__FUNCTION__, again_index, again_reg_value_h, again_reg_value_l, coarse_dgain_l, fine_dgain_h, fine_dgain_l);
+#endif
+
+	return 0;
+}
 /* input value:
  * line: exposure time value
  * line_num: linear mode: 1; dol2 mode: 2
@@ -446,7 +542,7 @@ static int sensor_aexp_line_control(hal_control_info_t *info, uint32_t mode, uin
 			dynamic_vts = 1084;
 		}else{
 			//NOTICE: fps = lines_per_second / vts
-			uint32_t fps = 32540 / dynamic_vts;
+			uint32_t fps = info->lines_per_second / dynamic_vts;
 #ifdef AE_DBG
 			printf("%s set fps = %d, vts = 0x%x \n", __FUNCTION__, fps, dynamic_vts);
 #endif
@@ -463,6 +559,13 @@ static int sensor_aexp_line_control(hal_control_info_t *info, uint32_t mode, uin
 		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, EXP_L_LINE1, temp1);
 		temp2 = (sline) & 0xFF;
 		vin_i2c_write8(info->bus_num, 16, info->sensor_addr, EXP_L_LINE2, temp2);
+
+		char ov50h40_dcg_en = hb_vin_i2c_read_reg16_data8(info->bus_num, info->sensor_addr, OV50H40_DCG_EN);
+		if(ov50h40_dcg_en == 0x1){
+			vin_i2c_write8(info->bus_num, 16, info->sensor_addr, 0x3540, temp0);
+			vin_i2c_write8(info->bus_num, 16, info->sensor_addr, 0x3541, temp1);
+			vin_i2c_write8(info->bus_num, 16, info->sensor_addr, 0x3542, temp2);
+		}
 
 #ifdef AE_DBG
 		printf("write sline = %d, 0x3500 = 0x%x, 0x3501 = 0x%x,0x3502 = 0x%x\n",
@@ -526,7 +629,7 @@ static int32_t sensor_dynamic_switch_fps(sensor_info_t *sensor_info, uint32_t fp
 			case NORMAL_M:
 					//NOTICE:
 					//vts = frame_length = lines_per_second / fps
-					vts = 32540 / fps;
+					vts = sensor_info->lines_per_second / fps;
 					break;
 			default:
 					vin_err("%s not support mode %d \n", __FUNCTION__, sensor_info->sensor_mode);
