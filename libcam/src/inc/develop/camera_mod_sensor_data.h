@@ -282,6 +282,7 @@ typedef struct hal_control_info_s {
 	uint32_t zoom_bus_num;
 	uint32_t zoom_addr;
 	uint32_t zoom_info[4];
+	int32_t lines_per_second;
 } hal_control_info_t;
 
 /**
@@ -357,6 +358,7 @@ typedef struct sensor_info_s {
 	int32_t ctrl_thread_created;
 	camera_pthread_t op_thread_id;
 	int32_t op_thread_created;
+	int32_t lines_per_second;
 } sensor_info_t;
 
 /**
@@ -370,5 +372,3 @@ typedef int32_t (*sensor_config_func)(sensor_info_t *);
 #endif
 
 #endif /* __CAMERA_MOD_SENSOR_DATA_H__ */
-
-
