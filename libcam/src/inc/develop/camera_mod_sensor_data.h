@@ -272,6 +272,7 @@ typedef struct hal_control_info_s {
 	uint32_t serial_addr;
 	uint32_t serial_addr1;
 	uint32_t sensor_mode;
+	uint32_t extra_mode;
 	uint32_t eeprom_addr;
 #ifdef CAM_CONFIG_INFO_LEGACY_COMPATIBLE
 	spi_data_t sensor_spi_info;
