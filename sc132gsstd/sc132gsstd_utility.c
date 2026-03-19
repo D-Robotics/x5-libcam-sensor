@@ -745,9 +745,9 @@ static int sc132gsstd_aexp_gain_control(hal_control_info_t *info, uint32_t mode,
 
 	/*
 	 * NOTE:
-	 * Use the SerDes context established during init to determine the active TX/VC instead.
+	 *  VC/TX binding must be per-sensor, not a process-global runtime state.
 	 */
-	vc_num = (int)g_serdes_ctx.tx_num;
+	vc_num = (int)info->extra_mode;
 	if (vc_num < 0 || vc_num > 3) {
 		vin_err("Global vc_num is invalid! vc_num=%d\n", vc_num);
 		return RET_ERROR;
@@ -852,7 +852,11 @@ static int sc132gsstd_aexp_line_control(hal_control_info_t *info, uint32_t mode,
 		return RET_ERROR;
 	}
 
-	vc_num = (int)g_serdes_ctx.tx_num;
+	/*
+	 * NOTE:
+	 *  VC/TX binding must be per-sensor, not a process-global runtime state.
+	 */
+	vc_num = (int)info->extra_mode;
 	if (vc_num < 0 || vc_num > 3) {
 		vin_err("Global vc_num is invalid! vc_num=%d\n", vc_num);
 		return RET_ERROR;

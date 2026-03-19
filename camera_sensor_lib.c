@@ -1096,6 +1096,7 @@ static void *camera_sensor_ctrl_func(void *arg)
 	ctrl.serial_addr = sen_if->serial_addr;
 	ctrl.serial_addr1 = sen_if->serial_addr1;
 	ctrl.eeprom_addr = sen_if->eeprom_addr;
+	ctrl.extra_mode = sen_if->extra_mode;
 	ctrl.lines_per_second = sen_if->lines_per_second;
 #ifdef CAM_CONFIG_INFO_LEGACY_COMPATIBLE
 	memcpy(&ctrl.sensor_spi_info, &sen_if->spi_info, sizeof(spi_data_t));
