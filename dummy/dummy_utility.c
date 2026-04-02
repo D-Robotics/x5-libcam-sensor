@@ -261,6 +261,12 @@ int dummy_linear_data_init(sensor_info_t *sensor_info)
 	uint32_t  open_cnt = 0;
 	uint32_t format;
 	int32_t bayer_start, bayer_pattern, exposure_max_bit_width;
+	int32_t lines_per_second = 33750;
+	int32_t exposure_time_max = 1012;
+	int32_t exposure_time_min = 1;
+	int32_t exposure_time_long_max = 2 * 1125 - 8;
+	int32_t analog_gain_max = 251;
+	int32_t digital_gain_max = 0;
 	sensor_turning_data_t turning_data;
 
 	memset(&turning_data, 0, sizeof(sensor_turning_data_t));
@@ -275,18 +281,33 @@ int dummy_linear_data_init(sensor_info_t *sensor_info)
 	strncpy(turning_data.sensor_name, sensor_info->sensor_name,
 		sizeof(turning_data.sensor_name));
 
-    turning_data.sensor_data.active_width = 1920;
+	turning_data.sensor_data.active_width = 1920;
 	turning_data.sensor_data.active_height = 1080;
-    turning_data.sensor_data.lines_per_second = 33750;//vts * fps, should be fixed = 1125 * 30
-        //lines_per_second/fps = vts
-        // from customer, max 10ms
-        // 1000ms -lines_per_second - 33750
-        // 10ms - 337, 33ms - 1125
-	turning_data.sensor_data.exposure_time_max = 377; //from customer, max 10ms
-	turning_data.sensor_data.exposure_time_min = 1;
-	turning_data.sensor_data.exposure_time_long_max = 2 * 1125 - 8;  //2*frame_length - 8  //linear not use
-    turning_data.sensor_data.analog_gain_max = 251; //we use again + dig fine gain
-	turning_data.sensor_data.digital_gain_max = 0;
+	if (sensor_param_parse(sensor_info, "tuning_data/lines_per_second", ISINT, &lines_per_second) != 0) {
+		sensor_param_parse(sensor_info, "lines_per_second", ISINT, &lines_per_second);
+	}
+	if (sensor_param_parse(sensor_info, "tuning_data/exposure_time_max", ISINT, &exposure_time_max) != 0) {
+		sensor_param_parse(sensor_info, "exposure_time_max", ISINT, &exposure_time_max);
+	}
+	if (sensor_param_parse(sensor_info, "tuning_data/exposure_time_min", ISINT, &exposure_time_min) != 0) {
+		sensor_param_parse(sensor_info, "exposure_time_min", ISINT, &exposure_time_min);
+	}
+	if (sensor_param_parse(sensor_info, "tuning_data/exposure_time_long_max", ISINT, &exposure_time_long_max) != 0) {
+		sensor_param_parse(sensor_info, "exposure_time_long_max", ISINT, &exposure_time_long_max);
+	}
+	if (sensor_param_parse(sensor_info, "tuning_data/analog_gain_max", ISINT, &analog_gain_max) != 0) {
+		sensor_param_parse(sensor_info, "analog_gain_max", ISINT, &analog_gain_max);
+	}
+	if (sensor_param_parse(sensor_info, "tuning_data/digital_gain_max", ISINT, &digital_gain_max) != 0) {
+		sensor_param_parse(sensor_info, "digital_gain_max", ISINT, &digital_gain_max);
+	}
+
+	turning_data.sensor_data.lines_per_second = lines_per_second;      // vts * fps
+	turning_data.sensor_data.exposure_time_max = exposure_time_max;    // default 1012
+	turning_data.sensor_data.exposure_time_min = exposure_time_min;    // default 1
+	turning_data.sensor_data.exposure_time_long_max = exposure_time_long_max;
+	turning_data.sensor_data.analog_gain_max = analog_gain_max;
+	turning_data.sensor_data.digital_gain_max = digital_gain_max;
 
 	//sensor bit && bayer
 	switch (sensor_info->format) {
