@@ -891,6 +891,24 @@ static int32_t camera_sensor_userspace_check(sensor_info_t *sen_if)
 	return (int32_t)userspace_enable;
 }
 
+static inline int field_changed(const void *a_field, const void *b_field, size_t size)
+{
+	int32_t ret = 0;
+
+	if (a_field == NULL || b_field == NULL)
+		return ret;
+	if (size == 0)
+		return ret;
+
+	if (memcmp(a_field, b_field, size) != 0)
+		ret = 1;
+
+	return ret;
+}
+
+#define FIELD_CHANGED(a, b, field) \
+    field_changed((&(a)->field), (&(b)->field), sizeof((a)->field))
+
 /**
  * @NO{S10E02C04}
  * @ASIL{B}
@@ -911,7 +929,7 @@ static int32_t camera_sensor_userspace_check(sensor_info_t *sen_if)
  * @callergraph
  * @design
  */
-static int32_t camera_sensor_ctrl_do(sensor_module_t *m, uint32_t enable, hal_control_info_t *ctrl, sensor_ctrl_info_t *info)
+static int32_t camera_sensor_ctrl_do(sensor_module_t *m, uint32_t enable, hal_control_info_t *ctrl, sensor_ctrl_info_t *info, sensor_ctrl_info_t *old_info)
 {
 	int32_t ret = RET_OK;
 	int32_t ops = 0;
@@ -928,22 +946,44 @@ static int32_t camera_sensor_ctrl_do(sensor_module_t *m, uint32_t enable, hal_co
 	if (((enable & HAL_GAIN_CONTROL) != 0U) && (m->aexp_gain_control != NULL)) {
 		camera_debug_loop_cami(ctrl->port, 3U, "aexp_gain_control");
 		ops |= HAL_GAIN_CONTROL;
-		ret |= m->aexp_gain_control(ctrl, info->mode, info->gain_buf, info->dgain_buf, info->gain_num);
+		if (FIELD_CHANGED(info, old_info, mode) ||
+			FIELD_CHANGED(info, old_info, gain_buf) ||
+			FIELD_CHANGED(info, old_info, dgain_buf) ||
+			FIELD_CHANGED(info, old_info, gain_num)) {
+			ret |= m->aexp_gain_control(ctrl, info->mode, info->gain_buf, info->dgain_buf, info->gain_num);
+		} else {
+			cam_dbg("%s gain same, ignore gain control\n", __func__);
+		}
 		camera_debug_loop_camo(ctrl->port, 3U, "aexp_gain_control");
 	}
 	/* write line */
 	if (((enable & HAL_LINE_CONTROL) != 0U) && (m->aexp_line_control != NULL)) {
 		camera_debug_loop_cami(ctrl->port, 4U, "aexp_line_control");
 		ops |= HAL_LINE_CONTROL;
-		ret |= m->aexp_line_control(ctrl, info->mode, info->line_buf, info->line_num);
+		if (FIELD_CHANGED(info, old_info, mode) ||
+			FIELD_CHANGED(info, old_info, line_buf) ||
+			FIELD_CHANGED(info, old_info, line_num)) {
+			ret |= m->aexp_line_control(ctrl, info->mode, info->line_buf, info->line_num);
+		} else {
+			cam_dbg("%s line same, ignore line control\n", __func__);
+		}
 		camera_debug_loop_cami(ctrl->port, 4U, "aexp_line_control");
 	}
 	/* write line/gain */
 	if (((enable & HAL_AE_LINE_GAIN_CONTROL) != 0U) && (m->aexp_line_gain_control != NULL)) {
 		camera_debug_loop_cami(ctrl->port, 5U, "aexp_line_gain_control");
 		ops |= HAL_AE_LINE_GAIN_CONTROL;
-		ret |= m->aexp_line_gain_control(ctrl, info->mode, info->line_buf, info->line_num,
-					info->gain_buf, info->dgain_buf, info->gain_num);
+		if (FIELD_CHANGED(info, old_info, mode) ||
+			FIELD_CHANGED(info, old_info, line_buf) ||
+			FIELD_CHANGED(info, old_info, line_num) ||
+			FIELD_CHANGED(info, old_info, gain_buf) ||
+			FIELD_CHANGED(info, old_info, dgain_buf) ||
+			FIELD_CHANGED(info, old_info, gain_num)) {
+			ret |= m->aexp_line_gain_control(ctrl, info->mode, info->line_buf, info->line_num,
+				info->gain_buf, info->dgain_buf, info->gain_num);
+		} else {
+			cam_dbg("%s line/gain same, ignore line/gain control\n", __func__);
+		}
 		camera_debug_loop_camo(ctrl->port, 5U, "aexp_line_gain_control");
 	}
 	/* write awb */
@@ -966,7 +1006,12 @@ static int32_t camera_sensor_ctrl_do(sensor_module_t *m, uint32_t enable, hal_co
 	if (((enable & HAL_AF_CONTROL) != 0U) && (m->af_control != NULL)) {
 		camera_debug_loop_cami(ctrl->port, 8U, "af_control");
 		ops |= HAL_AF_CONTROL;
-		ret |= m->af_control(ctrl, info->mode, info->af_pos);
+		if (FIELD_CHANGED(info, old_info, mode) ||
+			FIELD_CHANGED(info, old_info, af_pos)) {
+			ret |= m->af_control(ctrl, info->mode, info->af_pos);
+		} else {
+			cam_dbg("%s af same, ignore af control\n", __func__);
+		}
 		camera_debug_loop_camo(ctrl->port, 8U, "af_control");
 	}
 	// zoom control
@@ -1015,6 +1060,7 @@ static void *camera_sensor_ctrl_func(void *arg)
 	sensor_module_t *m;
 	hal_control_info_t ctrl = { 0 };
 	sensor_ctrl_info_t info = { 0 };
+	sensor_ctrl_info_t old_info = { 0 };
 	sensor_ctrl_result_t res = { 0 };
 	int32_t sindex;
 	char *sname;
@@ -1065,7 +1111,7 @@ static void *camera_sensor_ctrl_func(void *arg)
 			camera_sys_msleep(1);
 			continue;
 		}
-		ret = camera_sensor_ctrl_do(m, userspace_enable, &ctrl, &info);
+		ret = camera_sensor_ctrl_do(m, userspace_enable, &ctrl, &info, &old_info);
 		res.port = ctrl.port;
 		res.id = info.id;
 		if (ret < 0) {
@@ -1079,6 +1125,7 @@ static void *camera_sensor_ctrl_func(void *arg)
 			res.result = 0;
 			(void)camera_sensor_cdev_result(sen_if, &res);
 		}
+		memcpy(&old_info, &info, sizeof(sensor_ctrl_info_t));
 		camera_debug_loop_camo(ctrl.port, 1U, "ctrl_thread");
 	}
 
