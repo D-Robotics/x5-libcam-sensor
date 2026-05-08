@@ -26,6 +26,38 @@ int sc230ai_common_data_init(sensor_info_t *sensor_info);
 static int32_t sensor_dynamic_switch_fps(sensor_info_t *sensor_info, uint32_t fps);
 static int32_t sensor_update_fps_notify_driver(sensor_info_t *sensor_info);
 
+/*
+ * Quickstart delay scaling for SC230AI bring-up.
+ * Env:
+ *   CAM_QUICKSTART_SC230AI_DELAY_SCALE=100 (default, no change)
+ *   e.g. 50 -> half delays, 20 -> 20% delays
+ */
+static uint32_t sc230ai_delay_us(uint32_t base_us)
+{
+	static int inited;
+	static int scale_pct = 100;
+	const char *env;
+	long v;
+	uint64_t scaled;
+
+	if (!inited) {
+		inited = 1;
+		env = getenv("CAM_QUICKSTART_SC230AI_DELAY_SCALE");
+		if (env && env[0] != '\0') {
+			v = strtol(env, NULL, 10);
+			if (v >= 1 && v <= 100)
+				scale_pct = (int)v;
+		}
+	}
+	if (scale_pct == 100)
+		return base_us;
+	scaled = ((uint64_t)base_us * (uint64_t)scale_pct) / 100ULL;
+	/* Keep a tiny non-zero settle time when base delay is non-zero. */
+	if (base_us > 0U && scaled == 0U)
+		scaled = 1000U;
+	return (uint32_t)scaled;
+}
+
 int sensor_poweroff(sensor_info_t *sensor_info)
 {
         int gpio, ret = RET_OK;
@@ -59,14 +91,14 @@ int sensor_poweron(sensor_info_t *sensor_info)
                         if(sensor_info->gpio_pin[gpio] != -1) {
                                 ret = vin_power_ctrl(sensor_info->gpio_pin[gpio],
                                         sensor_info->gpio_level[gpio]);
-                                usleep(100 * 1000);  //100ms
+                                usleep(sc230ai_delay_us(100 * 1000));  //default 100ms
                                 ret |= vin_power_ctrl(sensor_info->gpio_pin[gpio],
                                         1 - sensor_info->gpio_level[gpio]);
                                 if(ret < 0) {
                                         vin_err("vin_power_ctrl fail\n");
                                         return -HB_CAM_SENSOR_POWERON_FAIL;
                                 }
-                                usleep(100 * 1000);  //100ms
+                                usleep(sc230ai_delay_us(100 * 1000));  //default 100ms
                         }
                 }
         }
@@ -149,7 +181,7 @@ int sensor_init(sensor_info_t *sensor_info)
         // Default 30fps
         // Switch frame rate based on application configuration
         //switch fps should be setted by user program, API: <hbn_camera_change_fps> !
-	usleep(100 * 1000);  //100ms
+	usleep(sc230ai_delay_us(100 * 1000));  //default 100ms
 	ret = sensor_dynamic_switch_fps(sensor_info, sensor_info->fps);
 	if (ret < 0) {
 		vin_err("sc230ai dynamic switch fps fail, ret = %d \n", ret);
