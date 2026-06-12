@@ -1,4 +1,3 @@
-
 ifneq ($(new)$(upd)$(upv),)
 # make for new/upd sub module
 
@@ -38,12 +37,25 @@ ifeq ($(TARGET),)
 
 SUB_IGNORE = _common
 SUB_ALL = $(filter-out $(SUB_IGNORE),$(notdir $(shell find . -mindepth 1 -maxdepth 1 -type d)))
+ifdef HB_SENSOR_LIST
+# HB_SENSOR_LIST is set (may be empty or "all" or a sensor list)
+ifeq ($(HB_SENSOR_LIST),all)
+SUB_LIST = $(SUB_ALL)
+else ifeq ($(HB_SENSOR_LIST),)
+# empty: build no sensor modules (but keep serial for common dependency)
+SUB_LIST = serial
+else
+SUB_LIST = serial $(filter $(HB_SENSOR_LIST),$(SUB_ALL))
+endif
+else
+# HB_SENSOR_LIST is not set: use original notuse/SUB_USEALL logic
 ifeq ($(SUB_USEALL),)
 # filter notuse sub
 SUB_NOTUSE = $(shell [ -f notuse ] && cat notuse |grep -v "^\#")
 SUB_LIST = $(filter-out $(SUB_NOTUSE),$(SUB_ALL))
 else
 SUB_LIST = $(SUB_ALL)
+endif
 endif
 SUB_CLEAN  = $(addsuffix _clean,$(SUB_LIST))
 SUB_INSTALL = $(addsuffix _install,$(SUB_LIST))
@@ -146,7 +158,7 @@ SO_NAMEV = $(SO_NAME).$(SO_VERSION_MAJOR)
 SO_NAMEVER = $(SO_NAME).$(SO_VERSION)
 
 # sub dirs: calibration
-SUB_IGNORE = inc src
+SUB_IGNORE = inc src cfg
 SUB_LIST = $(filter-out $(SUB_IGNORE),$(notdir $(shell find . -mindepth 1 -maxdepth 1 -type d)))
 SUB_CLEAN  = $(addsuffix _clean,$(SUB_LIST))
 SUB_INSTALL = $(addsuffix _install,$(SUB_LIST))
@@ -211,6 +223,20 @@ ifeq ($(HB_PKG_LIBCAM_RUNTIME_DEB)$(suffix $(SO_TARGET)), y.so)
 		${MODULE_RUNTIME_DIR}/usr/hobot/lib/sensor/$(notdir $(SO_NAMEV))
 	$(Q)ln -srf ${MODULE_RUNTIME_DIR}/usr/hobot/lib/sensor/$(notdir $(SO_NAMEVER)) \
 		${MODULE_RUNTIME_DIR}/usr/hobot/lib/sensor/$(notdir $(SO_NAME))
+	# check tuning json existence
+	$(Q)[ -d "$(CURDIR)/cfg" ] || exit 0; \
+		cd $(CURDIR)/cfg && \
+		for f in *_tuning*.json; do \
+			[ -f "$$f" ] && break; \
+			echo "no tuning json found in $(CURDIR)/cfg"; \
+			break; \
+		done
+	# install tuning and module_cfg json files
+	$(Q)[ -d "$(CURDIR)/cfg" ] || exit 0; \
+		cd $(CURDIR)/cfg && \
+		for f in *_tuning*.json *_module_cfg.json; do \
+			[ -f "$$f" ] && install -m 0644 "$$f" ${MODULE_RUNTIME_DIR}/usr/hobot/lib/sensor/ || break; \
+		done
 endif
 ifeq ($(HB_PKG_LIBCAM_DEV_DEB), y)
 ifeq ($(suffix $(SO_TARGET)), .so) # so add link.
