@@ -33,6 +33,16 @@ ifeq (${BUILD_OUTPUT_PATH},)
 export BUILD_OUTPUT_PATH=$(shell pwd)
 endif
 
+ifneq ($(wildcard $(IMAGE_DEPLOY_DIR)),)
+LIBCAM_SRC_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
+LIBCAM_ROOT := $(abspath $(LIBCAM_SRC_DIR)/../..)
+HBOT_CAMERA_ROOT := $(abspath $(LIBCAM_ROOT)/../..)
+CC := $(CROSS_COMPILE)gcc
+MODULE_DEV_DIR := $(HBOT_CAMERA_ROOT)/debian
+MODULE_RUNTIME_DIR := $(HBOT_CAMERA_ROOT)/debian
+HB_PKG_LIBCAM_DEV_DEB := y
+endif
+
 ifeq ($(TARGET),)
 # make for all sub list
 
@@ -99,11 +109,22 @@ SO_OBJS = $(patsubst ./%,${BUILD_OUTPUT_PATH}/%,$(SO_SRCS:.c=.o))
 
 # builid params
 INCS := -I../../inc/legacy/inc -I../../inc/legacy/utility -I../../inc/legacy/utility/sensor $(INCS)
-INCS := -I. -I../../inc  -I../../inc/private -I../../inc/develop -I../../inc/legacy $(INCS)
+INCS := -I. -I../../inc -I../../inc/private -I../../inc/develop -I../../inc/legacy $(INCS)
+ifneq ($(wildcard $(IMAGE_DEPLOY_DIR)),)
+INCS := -I$(LIBCAM_ROOT)/include -I$(HBOT_CAMERA_ROOT)/include $(INCS)
+endif
 
 CFLAGS += -fPIC
 LIBS += -lcam -lpthread -lm -lrt
+ifneq ($(wildcard $(IMAGE_DEPLOY_DIR)),)
+LDFLAGS := -L${BUILD_OUTPUT_PATH}/../../ -L$(HBOT_CAMERA_ROOT)/lib \
+	-Wl,-rpath=/usr/lib/aarch64-linux-gnu/ \
+	-Wl,-rpath=$(HBOT_CAMERA_ROOT)/lib \
+	-Wl,-rpath-link=$(HBOT_CAMERA_ROOT)/lib \
+	-shared $(LDFLAGS)
+else
 LDFLAGS := -L${BUILD_OUTPUT_PATH}/../../ -Wl,-rpath=/usr/lib/aarch64-linux-gnu/ $(LDFLAGS)
+endif
 
 CFLAGS += -Wno-unused-variable
 CFLAGS += -Wno-pointer-sign
