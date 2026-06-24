@@ -32,6 +32,16 @@ ifeq (${BUILD_OUTPUT_PATH},)
 export BUILD_OUTPUT_PATH=$(shell pwd)
 endif
 
+ifneq ($(wildcard $(IMAGE_DEPLOY_DIR)),)
+LIBCAM_SRC_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
+LIBCAM_ROOT := $(abspath $(LIBCAM_SRC_DIR)/../..)
+HBOT_CAMERA_ROOT := $(abspath $(LIBCAM_ROOT)/../..)
+CC := $(CROSS_COMPILE)gcc
+MODULE_DEV_DIR := $(HBOT_CAMERA_ROOT)/debian
+MODULE_RUNTIME_DIR := $(HBOT_CAMERA_ROOT)/debian
+HB_PKG_LIBCAM_DEV_DEB := y
+endif
+
 ifeq ($(TARGET),)
 # make for all sub list
 
@@ -109,17 +119,30 @@ endif
 SO_SRCS = $(wildcard ./*.c)
 SO_OBJS = $(patsubst ./%,${BUILD_OUTPUT_PATH}/%,$(SO_SRCS:.c=.o))
 
+ifeq ($(wildcard $(IMAGE_DEPLOY_DIR)),)
 INCDIR = inc
 DEPS = $(SO_OBJS:.o=.d)
 -include $(DEPS)
+endif
 
 # builid params
 INCS := -I../../inc/legacy/inc -I../../inc/legacy/utility -I../../inc/legacy/utility/sensor $(INCS)
-INCS := -I. -I../../inc  -I../../inc/private -I../../inc/develop -I../../inc/legacy $(INCS)
+INCS := -I. -I../../inc -I../../inc/private -I../../inc/develop -I../../inc/legacy $(INCS)
+ifneq ($(wildcard $(IMAGE_DEPLOY_DIR)),)
+INCS := -I$(LIBCAM_ROOT)/include -I$(HBOT_CAMERA_ROOT)/include $(INCS)
+endif
 
 CFLAGS += -fPIC
 LIBS += -lcam -lpthread -lm -lrt
+ifneq ($(wildcard $(IMAGE_DEPLOY_DIR)),)
+LDFLAGS := -L${BUILD_OUTPUT_PATH}/../../ -L$(HBOT_CAMERA_ROOT)/lib \
+	-Wl,-rpath=/usr/lib/aarch64-linux-gnu/ \
+	-Wl,-rpath=$(HBOT_CAMERA_ROOT)/lib \
+	-Wl,-rpath-link=$(HBOT_CAMERA_ROOT)/lib \
+	-shared $(LDFLAGS)
+else
 LDFLAGS := -L${BUILD_OUTPUT_PATH}/../../ -Wl,-rpath=/usr/lib/aarch64-linux-gnu/ $(LDFLAGS)
+endif
 
 CFLAGS += -Wno-unused-variable
 CFLAGS += -Wno-pointer-sign
@@ -128,6 +151,10 @@ CFLAGS += -Wno-unused-function
 CFLAGS += -Wno-unused-but-set-variable
 CFLAGS += -Wno-sizeof-pointer-memaccess
 CFLAGS += -fno-strict-aliasing
+ifneq ($(wildcard $(IMAGE_DEPLOY_DIR)),)
+#ADD CFLAGS_STATIC
+CFLAGS_STATIC = -rcs
+endif
 
 ifeq ($(TARGET), serial)
 # serial modules as a.
@@ -200,7 +227,7 @@ CFLAGS_THIS += -DSO_VERSION_MAJOR=$(SO_VERSION_MAJOR) -DSO_VERSION_MINOR=$(SO_VE
 ${BUILD_OUTPUT_PATH}/%.o: ./%.c
 	$(Q)mkdir -p $(abspath $(dir $@))
 	$(Q)echo CC $@
-	$(Q)$(CC) $(CFLAGS) $(CFLAGS_THIS) $(INCS) -I$(INCDIR) -MMD -c $< -o $@
+	$(Q)$(CC) $(CFLAGS) $(CFLAGS_THIS) $(INCS) $(if $(INCDIR),-I$(INCDIR),) -MMD -c $< -o $@
 
 $(SO_NAMEV): $(SO_NAMEVER)
 	$(Q)echo LN $@
@@ -247,6 +274,12 @@ ifeq ($(suffix $(SO_TARGET)), .so) # so add link.
 		${MODULE_DEV_DIR}/usr/hobot/lib/sensor/$(notdir $(SO_NAMEV))
 	$(Q)ln -srf ${MODULE_DEV_DIR}/usr/hobot/lib/sensor/$(notdir $(SO_NAMEVER)) \
 		${MODULE_DEV_DIR}/usr/hobot/lib/sensor/$(notdir $(SO_NAME))
+	# install tuning and module_cfg json files from cfg/
+	$(Q)[ -d "$(CURDIR)/cfg" ] || exit 0; \
+		cd $(CURDIR)/cfg && \
+		for f in *_tuning*.json *_module_cfg.json; do \
+			[ -f "$$f" ] && install -m 0644 "$$f" ${MODULE_DEV_DIR}/usr/hobot/lib/sensor/ || break; \
+		done
 else # a no link.
 	$(Q)echo INS DEV $(notdir $(SO_NAME))
 	$(Q)install -d ${MODULE_DEV_DIR}/usr/hobot/lib/sensor
