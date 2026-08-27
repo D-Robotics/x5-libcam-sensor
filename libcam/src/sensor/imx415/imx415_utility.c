@@ -228,7 +228,6 @@ static void set_gain_registers(hal_control_info_t *info, uint16_t again_reg,char
 {
 	vin_i2c_write8(info->bus_num, 16, info->sensor_addr, again_reg, again_val);
 }
-#define AE_DBG
 static int sensor_aexp_gain_control(hal_control_info_t *info, uint32_t mode, uint32_t *again, uint32_t *dgain, uint32_t gain_num)
 {
 #ifdef AE_DBG
